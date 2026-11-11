@@ -1,11 +1,11 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
+import 'excel_file_saver_stub.dart'
+    if (dart.library.io) 'excel_file_saver_io.dart'
+    if (dart.library.html) 'excel_file_saver_web.dart';
 
 class ExcelService {
   static final ExcelService _instance = ExcelService._internal();
@@ -692,18 +692,7 @@ class ExcelService {
     final bytes = excel.encode();
     if (bytes == null) return null;
 
-    final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/$filename';
-    final file = File(path);
-    await file.writeAsBytes(bytes);
-
-    await Share.shareXFiles(
-      [XFile(path)],
-      subject: filename,
-      text: 'تقرير دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
-    );
-
-    return path;
+    return saveExcelBytes(bytes, filename);
   }
 }
 
