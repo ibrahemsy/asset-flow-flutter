@@ -632,7 +632,7 @@ class ExcelService {
   String _cellStr(Data? cell) {
     if (cell == null || cell.value == null) return '';
     final v = cell.value;
-    if (v is TextCellValue) return v.value;
+    if (v is TextCellValue) return v.value.toPlainText();
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     if (v is DateCellValue) {
