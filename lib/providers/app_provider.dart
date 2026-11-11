@@ -364,6 +364,34 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  // -------------------- Secure admin handover --------------------
+
+  Future<String> createAdminHandover(String invitedEmail) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    return _firebase.createAdminHandover(invitedEmail);
+  }
+
+  Future<void> acceptAdminHandover(String operationId) async {
+    await _firebase.acceptAdminHandover(operationId);
+  }
+
+  Future<void> approveAdminHandover(String operationId) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    await _firebase.approveAdminHandover(operationId);
+    headEmail = '';
+    currentRole = UserRoleType.technician;
+    notifyListeners();
+  }
+
+  Future<Map<String, dynamic>> getAdminHandoverStatus(
+      String operationId) {
+    return _firebase.getAdminHandoverStatus(operationId);
+  }
+
   Future<void> updateHeadEmail(String email) async {
     if (!isHeadOfDept) return;
     await _firebase.updateHeadEmail(email);
