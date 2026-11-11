@@ -217,6 +217,8 @@ export const approveAdminHandover = onCall(async (request) => {
   // authoritative UID switch has committed successfully.
   await auth.setCustomUserClaims(nextUser.uid, {
     ...nextUser.customClaims, role: "system_admin", department: "telecom"
+  }).catch(() => {
+    // Firestore currentAdminUid is authoritative; claims can be refreshed later.
   });
 
   // Cleanup is best-effort: the authoritative Firestore UID has already moved,
@@ -226,7 +228,9 @@ export const approveAdminHandover = onCall(async (request) => {
     const claims = { ...(oldUser.customClaims ?? {}) };
     delete claims.role;
     delete claims.department;
-    await auth.setCustomUserClaims(oldUser.uid, claims);
+    await auth.setCustomUserClaims(oldUser.uid, claims).catch(() => {
+      // The former UID is already denied by Firestore rules.
+    });
   }
   return { operationId, status: "completed", newAdminUid: nextUser.uid };
 });
