@@ -558,6 +558,37 @@ class NetworkPortMapping {
       };
 }
 
+class NetworkSwitch {
+  final String id;
+  final String switchNumber;
+  final String name;
+  final String floor;
+  final String location;
+  final int portCount;
+  final String connectionType;
+  final List<NetworkSwitchPort> ports;
+  final String notes;
+  final String createdAt;
+  final String updatedAt;
+  NetworkSwitch({required this.id, required this.switchNumber, required this.name, required this.floor, required this.location, required this.portCount, required this.connectionType, this.ports = const [], this.notes = '', required this.createdAt, required this.updatedAt});
+  factory NetworkSwitch.fromMap(Map<String,dynamic> map, String id) => NetworkSwitch(
+    id:id, switchNumber:map['switchNumber'] ?? '', name:map['name'] ?? '', floor:map['floor'] ?? '',
+    location:map['location'] ?? '', portCount:(map['portCount'] as num?)?.toInt() ?? 0,
+    connectionType:map['connectionType'] ?? 'internalServer',
+    ports:(map['ports'] as List<dynamic>?)?.map((e)=>NetworkSwitchPort.fromMap(Map<String,dynamic>.from(e))).toList() ?? [],
+    notes:map['notes'] ?? '', createdAt:map['createdAt'] ?? '', updatedAt:map['updatedAt'] ?? '');
+  Map<String,dynamic> toMap()=>{'switchNumber':switchNumber,'name':name,'floor':floor,'location':location,'portCount':portCount,'connectionType':connectionType,'ports':ports.map((e)=>e.toMap()).toList(),'notes':notes,'createdAt':createdAt,'updatedAt':updatedAt};
+}
+class NetworkSwitchPort {
+  final String portNumber;
+  final String? pointNumber;
+  final String? connectedDeviceId;
+  final String? notes;
+  const NetworkSwitchPort({required this.portNumber,this.pointNumber,this.connectedDeviceId,this.notes});
+  factory NetworkSwitchPort.fromMap(Map<String,dynamic> map)=>NetworkSwitchPort(portNumber:map['portNumber'] ?? '',pointNumber:map['pointNumber'],connectedDeviceId:map['connectedDeviceId'],notes:map['notes']);
+  Map<String,dynamic> toMap()=>{'portNumber':portNumber,'pointNumber':pointNumber,'connectedDeviceId':connectedDeviceId,'notes':notes};
+}
+
 class Device {
   final String id;
   final String name;
@@ -576,6 +607,7 @@ class Device {
   /// internalServer | externalInternet | none
   final String? networkConnection;
   final String? switchNumber;
+  final String? switchId;
   final String? switchFloor;
   final String? switchPortNumber;
   final String? macAddress;
@@ -614,6 +646,7 @@ class Device {
     this.ipAddress,
     this.networkConnection,
     this.switchNumber,
+    this.switchId,
     this.switchFloor,
     this.switchPortNumber,
     this.macAddress,
@@ -689,6 +722,7 @@ class Device {
       ipAddress: map['ipAddress'],
       networkConnection: map['networkConnection'],
       switchNumber: map['switchNumber'],
+      switchId: map['switchId'],
       switchFloor: map['switchFloor'],
       switchPortNumber: map['switchPortNumber'],
       macAddress: map['macAddress'],
@@ -728,6 +762,7 @@ class Device {
         'ipAddress': ipAddress,
         'networkConnection': networkConnection,
         'switchNumber': switchNumber,
+        'switchId': switchId,
         'switchFloor': switchFloor,
         'switchPortNumber': switchPortNumber,
         'macAddress': macAddress,
