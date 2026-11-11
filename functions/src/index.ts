@@ -1,0 +1,212 @@
+import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+
+initializeApp();
+
+const db = getFirestore();
+const auth = getAuth();
+const settingsRef = db.collection("system_settings").doc("telecom");
+const requests = db.collection("adminHandoverRequests");
+const audit = db.collection("adminHandoverAudit");
+
+type CallableAuth = NonNullable<Parameters<Parameters<typeof onCall>[0]>[0]["auth"]>;
+
+function requireAuth(authContext: CallableAuth | undefined) {
+  if (!authContext) throw new HttpsError("unauthenticated", "يجب تسجيل الدخول.");
+  return authContext;
+}
+
+async function requireCurrentAdmin(uid: string, email: string | undefined) {
+  const snap = await settingsRef.get();
+  if (!snap.exists) throw new HttpsError("failed-precondition", "إعدادات الإدارة غير مهيأة.");
+  const data = snap.data() ?? {};
+  if (typeof data.currentAdminUid === "string") {
+    if (data.currentAdminUid !== uid) throw new HttpsError("permission-denied", "هذه العملية متاحة للمدير الحالي فقط.");
+  } else {
+    const admins = Array.isArray(data.adminEmails) ? data.adminEmails : [];
+    const normalized = (email ?? "").trim().toLowerCase();
+    if (!normalized || !admins.some((v: unknown) => typeof v === "string" && v.trim().toLowerCase() === normalized)) {
+      throw new HttpsError("permission-denied", "هذه العملية متاحة للمدير الحالي فقط.");
+    }
+  }
+  return snap;
+}
+
+function normalizeEmail(value: unknown): string {
+  if (typeof value !== "string") throw new HttpsError("invalid-argument", "أدخل بريداً إلكترونياً صالحاً.");
+  const email = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "أدخل بريداً إلكترونياً صالحاً.");
+  }
+  return email;
+}
+
+export const createAdminHandover = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const callerEmail = typeof caller.token.email === "string" ? caller.token.email : undefined;
+  await requireCurrentAdmin(caller.uid, callerEmail);
+  const invitedEmail = normalizeEmail(request.data?.invitedEmail);
+  if (invitedEmail === (callerEmail ?? "").toLowerCase()) {
+    throw new HttpsError("invalid-argument", "لا يمكن تسليم الإدارة إلى البريد نفسه.");
+  }
+
+  const target = await auth.getUserByEmail(invitedEmail).catch(() => null);
+  if (!target) throw new HttpsError("not-found", "يجب أن يكون للمدير الجديد حساب مسجل أولاً.");
+  if (!target.emailVerified) throw new HttpsError("failed-precondition", "يجب توثيق بريد المدير الجديد أولاً.");
+
+  const active = await requests.where("status", "in", [
+    "awaiting_new_admin_acceptance", "awaiting_current_admin_approval", "processing"
+  ]).limit(1).get();
+  if (!active.empty) throw new HttpsError("failed-precondition", "توجد عملية تسليم أخرى قيد التنفيذ.");
+
+  const ref = requests.doc();
+  await ref.create({
+    fromAdminUid: caller.uid,
+    fromAdminEmail: callerEmail ?? "",
+    invitedEmail,
+    toAdminUid: null,
+    status: "awaiting_new_admin_acceptance",
+    requestedAt: FieldValue.serverTimestamp(),
+    acceptedAt: null,
+    approvedAt: null,
+    completedAt: null
+  });
+  await audit.add({
+    operationId: ref.id, eventType: "handover_requested",
+    actorUid: caller.uid, invitedEmail, timestamp: FieldValue.serverTimestamp()
+  });
+  return { operationId: ref.id, status: "awaiting_new_admin_acceptance" };
+});
+
+export const acceptAdminHandover = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const email = normalizeEmail(caller.token.email);
+  if (caller.token.email_verified !== true) {
+    throw new HttpsError("failed-precondition", "يجب توثيق بريد الحساب أولاً.");
+  }
+  const operationId = String(request.data?.operationId ?? "");
+  if (!operationId) throw new HttpsError("invalid-argument", "معرّف طلب التسليم مطلوب.");
+  const ref = requests.doc(operationId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new HttpsError("not-found", "طلب التسليم غير موجود.");
+    const data = snap.data()!;
+    if (data.invitedEmail !== email) throw new HttpsError("permission-denied", "هذا الطلب غير موجه إلى حسابك.");
+    if (data.status !== "awaiting_new_admin_acceptance") {
+      throw new HttpsError("failed-precondition", "حالة طلب التسليم لا تسمح بالقبول.");
+    }
+    tx.update(ref, {
+      toAdminUid: caller.uid, toAdminEmail: email,
+      status: "awaiting_current_admin_approval",
+      acceptedAt: FieldValue.serverTimestamp()
+    });
+  });
+  await audit.add({
+    operationId, eventType: "handover_accepted", actorUid: caller.uid,
+    timestamp: FieldValue.serverTimestamp()
+  });
+  return { operationId, status: "awaiting_current_admin_approval" };
+});
+
+export const approveAdminHandover = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const callerEmail = typeof caller.token.email === "string" ? caller.token.email : undefined;
+  await requireCurrentAdmin(caller.uid, callerEmail);
+
+  const authTime = Number(caller.token.auth_time ?? 0);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (!authTime || nowSeconds - authTime > 600) {
+    throw new HttpsError("failed-precondition", "أعد تسجيل المصادقة ثم أكد التسليم خلال عشر دقائق.");
+  }
+
+  const operationId = String(request.data?.operationId ?? "");
+  if (!operationId) throw new HttpsError("invalid-argument", "معرّف طلب التسليم مطلوب.");
+  const handoverRef = requests.doc(operationId);
+  const handoverSnap = await handoverRef.get();
+  if (!handoverSnap.exists) throw new HttpsError("not-found", "طلب التسليم غير موجود.");
+  const handover = handoverSnap.data()!;
+  if (handover.fromAdminUid !== caller.uid || handover.status !== "awaiting_current_admin_approval") {
+    throw new HttpsError("failed-precondition", "الطلب غير مقبول أو لم يعد تابعاً للمدير الحالي.");
+  }
+  if (typeof handover.toAdminUid !== "string") {
+    throw new HttpsError("failed-precondition", "لم يقبل المدير الجديد الدعوة.");
+  }
+
+  const nextUser = await auth.getUser(handover.toAdminUid);
+  if (!nextUser.email || nextUser.email.toLowerCase() !== handover.invitedEmail || !nextUser.emailVerified) {
+    throw new HttpsError("failed-precondition", "تعذر التحقق من حساب المدير الجديد وبريده الموثق.");
+  }
+
+  // Set the claim first. Firestore authorization remains with the old UID until
+  // the following transaction atomically changes currentAdminUid.
+  await auth.setCustomUserClaims(nextUser.uid, {
+    ...nextUser.customClaims, role: "system_admin", department: "telecom"
+  });
+
+  await db.runTransaction(async (tx) => {
+    const [settingsSnap, currentRequest] = await Promise.all([
+      tx.get(settingsRef), tx.get(handoverRef)
+    ]);
+    if (!settingsSnap.exists || !currentRequest.exists) {
+      throw new HttpsError("not-found", "إعدادات الإدارة أو طلب التسليم غير موجود.");
+    }
+    const current = settingsSnap.data()!;
+    const latest = currentRequest.data()!;
+    if (current.currentAdminUid && current.currentAdminUid !== caller.uid) {
+      throw new HttpsError("aborted", "تغير المدير الحالي أثناء تنفيذ العملية.");
+    }
+    if (latest.status !== "awaiting_current_admin_approval" ||
+        latest.fromAdminUid !== caller.uid || latest.toAdminUid !== nextUser.uid) {
+      throw new HttpsError("aborted", "تغيرت حالة طلب التسليم.");
+    }
+    tx.update(settingsRef, {
+      currentAdminUid: nextUser.uid,
+      currentAdminEmail: nextUser.email!.toLowerCase(),
+      adminEmails: [nextUser.email!.toLowerCase()],
+      updatedAt: new Date().toISOString(),
+      lastHandoverId: operationId
+    });
+    tx.update(handoverRef, {
+      status: "completed",
+      approvedAt: FieldValue.serverTimestamp(),
+      completedAt: FieldValue.serverTimestamp()
+    });
+    tx.create(audit.doc(), {
+      operationId, eventType: "handover_completed",
+      fromAdminUid: caller.uid, toAdminUid: nextUser.uid,
+      actorUid: caller.uid, timestamp: FieldValue.serverTimestamp()
+    });
+  });
+
+  // Cleanup is best-effort: the authoritative Firestore UID has already moved,
+  // so the former administrator is no longer authorized by the security rules.
+  const oldUser = await auth.getUser(caller.uid).catch(() => null);
+  if (oldUser) {
+    const claims = { ...(oldUser.customClaims ?? {}) };
+    delete claims.role;
+    delete claims.department;
+    await auth.setCustomUserClaims(oldUser.uid, claims);
+  }
+  return { operationId, status: "completed", newAdminUid: nextUser.uid };
+});
+
+export const getAdminHandoverStatus = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const operationId = String(request.data?.operationId ?? "");
+  if (!operationId) throw new HttpsError("invalid-argument", "معرّف طلب التسليم مطلوب.");
+  const snap = await requests.doc(operationId).get();
+  if (!snap.exists) throw new HttpsError("not-found", "طلب التسليم غير موجود.");
+  const data = snap.data()!;
+  if (data.fromAdminUid !== caller.uid && data.toAdminUid !== caller.uid) {
+    throw new HttpsError("permission-denied", "لا يمكنك الاطلاع على هذا الطلب.");
+  }
+  return {
+    operationId, status: data.status,
+    invitedEmail: data.invitedEmail,
+    requestedAt: data.requestedAt?.toDate?.()?.toISOString() ?? null,
+    acceptedAt: data.acceptedAt?.toDate?.()?.toISOString() ?? null,
+    completedAt: data.completedAt?.toDate?.()?.toISOString() ?? null
+  };
+});
