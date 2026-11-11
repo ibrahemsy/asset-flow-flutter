@@ -573,6 +573,11 @@ class Device {
   final String? caseType;
   final String? networkCables;
   final String? ipAddress;
+  /// internalServer | externalInternet | none
+  final String? networkConnection;
+  final String? switchNumber;
+  final String? switchFloor;
+  final String? switchPortNumber;
   final String? macAddress;
   final int? portsCount;
   final List<NetworkPortMapping>? portMappings;
@@ -607,6 +612,10 @@ class Device {
     this.caseType,
     this.networkCables,
     this.ipAddress,
+    this.networkConnection,
+    this.switchNumber,
+    this.switchFloor,
+    this.switchPortNumber,
     this.macAddress,
     this.portsCount,
     this.portMappings,
@@ -678,6 +687,10 @@ class Device {
       caseType: map['caseType'],
       networkCables: map['networkCables'],
       ipAddress: map['ipAddress'],
+      networkConnection: map['networkConnection'],
+      switchNumber: map['switchNumber'],
+      switchFloor: map['switchFloor'],
+      switchPortNumber: map['switchPortNumber'],
       macAddress: map['macAddress'],
       portsCount: map['portsCount'],
       portMappings: portsList,
@@ -713,6 +726,10 @@ class Device {
         'caseType': caseType,
         'networkCables': networkCables,
         'ipAddress': ipAddress,
+        'networkConnection': networkConnection,
+        'switchNumber': switchNumber,
+        'switchFloor': switchFloor,
+        'switchPortNumber': switchPortNumber,
         'macAddress': macAddress,
         'portsCount': portsCount,
         'portMappings': portMappings?.map((e) => e.toMap()).toList(),
