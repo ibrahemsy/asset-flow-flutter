@@ -168,6 +168,22 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
                         label: const Text('اعتماد التسليم النهائي'),
                       ),
                     ),
+                  if (isCurrentAdmin)
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: _busy || _operationController.text.trim().isEmpty
+                            ? null
+                            : () => _run(() async {
+                                  await app.cancelAdminHandover(_operationController.text.trim());
+                                  if (mounted) {
+                                    setState(() => _message = 'تم إلغاء طلب التسليم.');
+                                  }
+                                }),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('إلغاء طلب التسليم'),
+                      ),
+                    ),
                   if (_busy) const LinearProgressIndicator(),
                   if (_message != null) ...[
                     const SizedBox(height: 12),
