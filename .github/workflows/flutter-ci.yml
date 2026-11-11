@@ -27,6 +27,13 @@ jobs:
       - name: Generate platform scaffolding
         run: flutter create --platforms=web,android,ios,windows,linux,macos --no-pub .
 
+      - name: Remove generated placeholder test
+        shell: bash
+        run: |
+          if [ -f test/widget_test.dart ] && grep -q "MyApp" test/widget_test.dart && ! grep -q "class MyApp" lib/main.dart; then
+            rm test/widget_test.dart
+          fi
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -110,7 +117,7 @@ jobs:
           if [ ! -x "$SDKMANAGER" ]; then
             SDKMANAGER="$(command -v sdkmanager)"
           fi
-          yes | "$SDKMANAGER" --install "platforms;android-36"
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "platforms;android-36" </dev/null
 
       - name: Install dependencies
         run: flutter pub get
