@@ -85,9 +85,9 @@ class AppProvider extends ChangeNotifier {
       headEmail = settings.headEmail;
       departmentName = settings.departmentName;
 
-      if (isHeadOfDept) {
-        currentRole = UserRoleType.director;
-      }
+      currentRole = isHeadOfDept
+          ? UserRoleType.director
+          : UserRoleType.technician;
 
       // Cancel previous data subscriptions
       for (final s in _subs.skip(1)) {
@@ -137,6 +137,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   void _clearData() {
+    headEmail = FirebaseService.defaultHeadEmail;
+    currentRole = UserRoleType.technician;
     devices = [];
     custodyCards = [];
     movements = [];
