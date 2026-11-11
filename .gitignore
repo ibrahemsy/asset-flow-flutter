@@ -1,0 +1,39 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+doc/api/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Platform secrets (ضع ملفاتك محلياً بعد clone)
+**/google-services.json
+**/GoogleService-Info.plist
+**/firebase_app_id_file.json
+
+# Env / keys
+.env
+.env.*
+*.pem
+service-account*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
