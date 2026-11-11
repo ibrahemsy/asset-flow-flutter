@@ -37,6 +37,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   List<Device> devices = [];
+  List<NetworkSwitch> networkSwitches = [];
   List<CustodyCard> custodyCards = [];
   List<Movement> movements = [];
   List<MaintenanceTicket> tickets = [];
@@ -120,6 +121,10 @@ class AppProvider extends ChangeNotifier {
         phoneDirectory = list;
         notifyListeners();
       }));
+      _subs.add(_firebase.networkSwitchesStream().listen((list) {
+        networkSwitches = list;
+        notifyListeners();
+      }));
       _subs.add(_firebase.telecomNetworksStream().listen((list) {
         telecomNetworks = list;
         notifyListeners();
@@ -140,6 +145,7 @@ class AppProvider extends ChangeNotifier {
     headEmail = FirebaseService.defaultHeadEmail;
     currentRole = UserRoleType.technician;
     devices = [];
+    networkSwitches = [];
     custodyCards = [];
     movements = [];
     tickets = [];
@@ -170,6 +176,21 @@ class AppProvider extends ChangeNotifier {
   }
 
   // -------------------- CRUD Wrappers --------------------
+
+  Future<String?> saveNetworkSwitch(NetworkSwitch networkSwitch) async {
+    if (currentUser == null) return 'يجب تسجيل الدخول';
+    isSyncing = true;
+    notifyListeners();
+    try {
+      await _firebase.saveNetworkSwitch(networkSwitch, currentUser!, isHeadOfDept);
+      return isHeadOfDept ? null : 'تم إرسال طلب السويتش لرئيس الدائرة للاعتماد';
+    } catch (e) {
+      return 'خطأ: $e';
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
+  }
 
   Future<String?> saveDevice(Device device) async {
     if (currentUser == null) return 'يجب تسجيل الدخول';
