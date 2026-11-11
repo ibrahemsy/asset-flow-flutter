@@ -201,6 +201,39 @@ export const approveAdminHandover = onCall(async (request) => {
   return { operationId, status: "completed", newAdminUid: nextUser.uid };
 });
 
+export const cancelAdminHandover = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const callerEmail = typeof caller.token.email === "string" ? caller.token.email : undefined;
+  await requireCurrentAdmin(caller.uid, callerEmail);
+  const operationId = String(request.data?.operationId ?? "");
+  if (!operationId) throw new HttpsError("invalid-argument", "معرّف طلب التسليم مطلوب.");
+  const ref = requests.doc(operationId);
+  await db.runTransaction(async (tx) => {
+    const [settingsSnap, requestSnap] = await Promise.all([
+      tx.get(settingsRef), tx.get(ref)
+    ]);
+    if (!settingsSnap.exists || !requestSnap.exists) {
+      throw new HttpsError("not-found", "طلب التسليم غير موجود.");
+    }
+    const settings = settingsSnap.data()!;
+    const handover = requestSnap.data()!;
+    if (handover.fromAdminUid !== caller.uid ||
+        !["awaiting_new_admin_acceptance", "awaiting_current_admin_approval"].includes(handover.status)) {
+      throw new HttpsError("failed-precondition", "لا يمكن إلغاء هذا الطلب في حالته الحالية.");
+    }
+    if (settings.pendingHandoverId !== operationId) {
+      throw new HttpsError("aborted", "الطلب لم يعد العملية النشطة.");
+    }
+    tx.update(ref, { status: "cancelled", cancelledAt: FieldValue.serverTimestamp() });
+    tx.update(settingsRef, { pendingHandoverId: FieldValue.delete() });
+    tx.create(audit.doc(), {
+      operationId, eventType: "handover_cancelled",
+      actorUid: caller.uid, timestamp: FieldValue.serverTimestamp()
+    });
+  });
+  return { operationId, status: "cancelled" };
+});
+
 export const getAdminHandoverStatus = onCall(async (request) => {
   const caller = requireAuth(request.auth);
   const operationId = String(request.data?.operationId ?? "");
