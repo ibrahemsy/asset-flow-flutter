@@ -89,6 +89,7 @@ class FirebaseService {
     'auditLogs',
     'phoneDirectory',
     'telecomNetworks',
+    'networkSwitches',
   };
 
   CollectionReference _deptCollection(String name) {
@@ -237,6 +238,12 @@ class FirebaseService {
         );
   }
 
+  Stream<List<NetworkSwitch>> networkSwitchesStream() {
+    return _deptCollection('networkSwitches').snapshots().map(
+      (snap) => snap.docs.map((d) => NetworkSwitch.fromMap(d.data() as Map<String,dynamic>, d.id)).toList(),
+    );
+  }
+
   Stream<List<TelecomNetworkInfo>> telecomNetworksStream() {
     return _deptCollection('telecomNetworks').snapshots().map(
           (snap) => snap.docs.map((d) => TelecomNetworkInfo.fromMap(d.data() as Map<String, dynamic>, d.id)).toList(),
@@ -362,6 +369,15 @@ class FirebaseService {
   }
 
   // Convenience wrappers
+  Future<void> saveNetworkSwitch(NetworkSwitch networkSwitch, User user, bool isHead) async {
+    await submitOrCommit(
+      targetCollection: 'networkSwitches', actionType: 'save_network_switch',
+      title: 'تسجيل/تعديل سويتش شبكة',
+      details: 'السويتش ${networkSwitch.switchNumber} - ${networkSwitch.name}',
+      payload: {'id': networkSwitch.id, ...networkSwitch.toMap()}, user: user, isHead: isHead,
+    );
+  }
+
   Future<void> saveDevice(Device device, User user, bool isHead) async {
     await submitOrCommit(
       targetCollection: 'devices',
