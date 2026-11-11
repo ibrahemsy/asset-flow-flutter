@@ -45,6 +45,19 @@ class FirebaseService {
     }
   }
 
+  Future<void> reauthenticateCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('يجب تسجيل الدخول أولاً.');
+    final account = await _googleSignIn.signIn();
+    if (account == null) throw StateError('تم إلغاء إعادة المصادقة.');
+    final tokens = await account.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: tokens.accessToken,
+      idToken: tokens.idToken,
+    );
+    await user.reauthenticateWithCredential(credential);
+  }
+
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
