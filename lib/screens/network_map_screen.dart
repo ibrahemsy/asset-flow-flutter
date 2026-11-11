@@ -47,7 +47,7 @@ class NetworkMapScreen extends StatelessWidget {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$value', style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10))]));
 
   Widget _switchCard(BuildContext context, NetworkSwitch sw, AppProvider app) {
-    final used = sw.ports.where((p) => (p.connectedDeviceId ?? '').isNotEmpty).length;
+    final used = app.devices.where((d) => d.switchId == sw.id && (d.switchPortNumber ?? '').isNotEmpty).length;
     final pointsMissing = sw.ports.where((p) => p.pointNumber == null || p.pointNumber!.trim().isEmpty).length;
     return Card(color: const Color(0xFF1E293B), margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(leading: const Icon(Icons.device_hub, color: Colors.cyanAccent),
