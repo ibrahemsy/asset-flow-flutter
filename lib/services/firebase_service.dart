@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/models.dart';
@@ -10,6 +11,7 @@ class FirebaseService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
@@ -122,6 +124,42 @@ class FirebaseService {
           'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
       updatedAt: data['updatedAt']?.toString(),
     );
+  }
+
+  // -------------------- Secure admin handover --------------------
+
+  Future<String> createAdminHandover(String invitedEmail) async {
+    final result = await _functions
+        .httpsCallable('createAdminHandover')
+        .call<Map<String, dynamic>>({'invitedEmail': invitedEmail.trim()});
+    final operationId = result.data['operationId'] as String?;
+    if (operationId == null || operationId.isEmpty) {
+      throw StateError('لم يُرجع الخادم معرّف طلب التسليم.');
+    }
+    return operationId;
+  }
+
+  Future<void> acceptAdminHandover(String operationId) async {
+    await _functions.httpsCallable('acceptAdminHandover').call({
+      'operationId': operationId,
+    });
+  }
+
+  Future<void> approveAdminHandover(String operationId) async {
+    await _functions.httpsCallable('approveAdminHandover').call({
+      'operationId': operationId,
+    });
+    // The former administrator must refresh their local authorization state.
+    _adminEmails = [];
+    await _auth.currentUser?.getIdToken(true);
+  }
+
+  Future<Map<String, dynamic>> getAdminHandoverStatus(
+      String operationId) async {
+    final result = await _functions
+        .httpsCallable('getAdminHandoverStatus')
+        .call<Map<String, dynamic>>({'operationId': operationId});
+    return result.data;
   }
 
   Future<void> updateHeadEmail(String email) async {
