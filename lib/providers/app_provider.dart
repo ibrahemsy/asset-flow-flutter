@@ -377,6 +377,10 @@ class AppProvider extends ChangeNotifier {
     return _firebase.createAdminHandover(invitedEmail);
   }
 
+  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() {
+    return _firebase.findMyAdminHandoverInvitation();
+  }
+
   Future<void> acceptAdminHandover(String operationId) async {
     await _firebase.acceptAdminHandover(operationId);
   }
