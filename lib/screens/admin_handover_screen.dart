@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 
@@ -177,11 +178,16 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () {
-                          // Copying can be added with Clipboard once clipboard UX is wired.
+                        onPressed: () async {
+                          await Clipboard.setData(ClipboardData(text: _operationId!));
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('تم نسخ معرّف طلب التسليم')),
+                            );
+                          }
                         },
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text('احتفظ بالمعرّف وشاركه مع المدير الجديد'),
+                        icon: const Icon(Icons.copy),
+                        label: const Text('نسخ معرّف الطلب لمشاركته مع المدير الجديد'),
                       ),
                     ),
                   ],
