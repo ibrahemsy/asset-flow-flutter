@@ -35,6 +35,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /department_data/telecom/networkSwitches/{switchId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /pendingRequests/{requestId} {
       allow create: if signedIn()
         && request.resource.data.requesterUid == request.auth.uid
@@ -45,7 +50,8 @@ service cloud.firestore {
           'movements',
           'maintenanceTickets',
           'phoneDirectory',
-          'telecomNetworks'
+          'telecomNetworks',
+          'networkSwitches'
         ]
         && request.resource.data.actionType is string
         && request.resource.data.title is string
