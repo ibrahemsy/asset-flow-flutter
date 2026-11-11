@@ -66,7 +66,20 @@ class FirebaseService {
 
   // -------------------- Helpers --------------------
 
+  static const Set<String> _allowedDepartmentCollections = {
+    'devices',
+    'custodyCards',
+    'movements',
+    'maintenanceTickets',
+    'auditLogs',
+    'phoneDirectory',
+    'telecomNetworks',
+  };
+
   CollectionReference _deptCollection(String name) {
+    if (!_allowedDepartmentCollections.contains(name)) {
+      throw ArgumentError.value(name, 'name', 'مجموعة بيانات غير مسموح بها');
+    }
     return _db.collection('department_data').doc('telecom').collection(name);
   }
 
