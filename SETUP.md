@@ -71,7 +71,7 @@ firebase deploy --only firestore:rules
 
 المتطلبات:
 - مشروع Firebase يدعم نشر Cloud Functions (قد يتطلب تفعيل خطة الفوترة Blaze وفق متطلبات Firebase الحالية).
-- Node.js 20 وFirebase CLI.
+- Node.js 22 وFirebase CLI.
 - المدير الجديد أنشأ حساباً وسجّل الدخول مرة واحدة على الأقل ووثّق بريده.
 - نشر قواعد Firestore وCloud Functions من مالك المشروع أو شخص مخوّل.
 
