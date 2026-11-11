@@ -93,16 +93,18 @@ export const findMyAdminHandoverInvitation = onCall(async (request) => {
   }
   const snapshot = await requests
     .where("invitedEmail", "==", email)
-    .where("status", "==", "awaiting_new_admin_acceptance")
-    .limit(2)
+    .limit(20)
     .get();
-  if (snapshot.empty) {
+  const invitations = snapshot.docs.filter(
+    (doc) => doc.get("status") === "awaiting_new_admin_acceptance"
+  );
+  if (invitations.length === 0) {
     throw new HttpsError("not-found", "لا توجد دعوة تسليم معلقة لهذا البريد.");
   }
-  if (snapshot.size > 1) {
+  if (invitations.length > 1) {
     throw new HttpsError("failed-precondition", "توجد أكثر من دعوة؛ راجع مالك النظام.");
   }
-  const doc = snapshot.docs[0];
+  const doc = invitations[0];
   return {
     operationId: doc.id,
     fromAdminEmail: doc.get("fromAdminEmail") ?? "",
