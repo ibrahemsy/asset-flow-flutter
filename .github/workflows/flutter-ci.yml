@@ -30,7 +30,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
+
           candidates = [
               Path("android/app/build.gradle.kts"),
               Path("android/app/build.gradle"),
@@ -38,24 +38,28 @@ jobs:
           files = [path for path in candidates if path.exists()]
           if not files:
               raise SystemExit("Android app Gradle file was not generated")
+
           path = files[0]
           content = path.read_text()
-          updated = re.sub(
-              r"compileSdk\\s*=\\s*flutter\\.compileSdkVersion",
-              "compileSdk = 36",
-              content,
+          replacements = (
+              ("compileSdk = flutter.compileSdkVersion", "compileSdk = 36"),
+              ("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36"),
           )
-          updated = re.sub(
-              r"compileSdkVersion\\s+flutter\\.compileSdkVersion",
-              "compileSdkVersion 36",
-              updated,
-          )
-          if updated == content and not re.search(r"compileSdk(?:Version)?\\s*(?:=\\s*)?36", content):
+          updated = content
+          for source, target in replacements:
+              updated = updated.replace(source, target)
+
+          if updated == content and "compileSdk = 36" not in content and "compileSdkVersion 36" not in content:
               raise SystemExit(f"Could not safely set compileSdk 36 in {path}")
+
           path.write_text(updated)
           print(f"Configured compileSdk 36 in {path}")
           PY
-          yes | sdkmanager "platforms;android-36"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          fi
+          yes | "$SDKMANAGER" --install "platforms;android-36"
           
       - name: Install dependencies
         run: flutter pub get
