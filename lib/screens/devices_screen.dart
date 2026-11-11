@@ -272,6 +272,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final switchPortCtrl = TextEditingController(text: existing?.switchPortNumber);
     String networkConnection = existing?.networkConnection ?? '';
     String switchFloor = existing?.switchFloor ?? 'الأرضي';
+    String? selectedSwitchId = existing?.switchId;
     DeviceCategory category = existing?.category ?? DeviceCategory.desktop;
     DeviceCondition condition = existing?.condition ?? DeviceCondition.good;
     DeviceStatus status = existing?.status ?? DeviceStatus.inWarehouse;
@@ -347,7 +348,18 @@ class _DevicesScreenState extends State<DevicesScreen> {
                       onChanged: (v) => setModalState(() => networkConnection = v ?? ''),
                     ),
                     if (networkConnection == 'internalServer' || networkConnection == 'externalInternet') ...[
-                      TextField(controller: switchNumberCtrl, decoration: const InputDecoration(labelText: 'رقم السويتش')),
+                      DropdownButtonFormField<String>(
+                        value: selectedSwitchId,
+                        decoration: const InputDecoration(labelText: 'السويتش المسجل (اختياري للربط لاحقاً)'),
+                        items: app.networkSwitches.map((sw) => DropdownMenuItem(value: sw.id, child: Text('السويتش ${sw.switchNumber} - ${sw.floor} (${sw.portCount} منفذ)'))).toList(),
+                        onChanged: (v) => setModalState(() {
+                          selectedSwitchId = v;
+                          final selected = app.networkSwitches.where((sw) => sw.id == v).firstOrNull;
+                          if (selected != null) { switchNumberCtrl.text = selected.switchNumber; switchFloor = selected.floor; }
+                        }),
+                      ),
+                      if (app.networkSwitches.isEmpty) const Text('لا يوجد سجل سويتشات بعد. يمكنك تسجيل الجهاز أولاً وربطه لاحقاً.', style: TextStyle(fontSize: 11, color: Colors.orange)),
+                      TextField(controller: switchNumberCtrl, decoration: const InputDecoration(labelText: 'رقم السويتش (للتوثيق المؤقت عند عدم الربط)')),
                       DropdownButtonFormField<String>(
                         value: switchFloor,
                         decoration: const InputDecoration(labelText: 'طابق السويتش'),
@@ -405,6 +417,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         location: locationCtrl.text.trim(),
                         networkConnection: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? networkConnection : existing?.networkConnection,
                         switchNumber: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchNumberCtrl.text.trim() : existing?.switchNumber,
+                        switchId: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? selectedSwitchId : existing?.switchId,
                         switchFloor: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchFloor : existing?.switchFloor,
                         switchPortNumber: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchPortCtrl.text.trim() : existing?.switchPortNumber,
                         notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
