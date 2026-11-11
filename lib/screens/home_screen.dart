@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'admin_handover_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
@@ -58,6 +59,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const UsersScreen();
       case 'audit':
         return const AuditScreen();
+      case 'admin_handover':
+        return const AdminHandoverScreen();
       default:
         return const DashboardScreen();
     }
@@ -297,6 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (app.isHeadOfDept)
         _DrawerItem(AppIcons.approvals, 'الاعتماد', 'approvals', AppTheme.danger, badge: pendingCount),
       _DrawerItem(AppIcons.audit, 'السجل', 'audit', AppTheme.textSecondary),
+      _DrawerItem(Icons.swap_horiz_rounded, 'تسليم / استلام الإدارة', 'admin_handover', AppTheme.primaryDark),
       if (app.isHeadOfDept) _DrawerItem(AppIcons.users, 'الإدارة', 'users', AppTheme.primaryDark),
     ];
 

@@ -37,6 +37,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   List<Device> devices = [];
+  List<NetworkSwitch> networkSwitches = [];
   List<CustodyCard> custodyCards = [];
   List<Movement> movements = [];
   List<MaintenanceTicket> tickets = [];
@@ -51,8 +52,7 @@ class AppProvider extends ChangeNotifier {
 
   /// رئيس دائرة الاتصالات = مدير النظام
   bool get isHeadOfDept =>
-      _backend.isSystemAdmin(currentUser?.email) ||
-      _firebase.isHeadOfDept(currentUser?.email, headEmail);
+      _firebase.isSystemAdmin(currentUser?.email, headEmail);
 
   /// مدير النظام (نفس رئيس الدائرة — صلاحيات كاملة)
   bool get isSystemAdmin => isHeadOfDept;
@@ -86,9 +86,9 @@ class AppProvider extends ChangeNotifier {
       headEmail = settings.headEmail;
       departmentName = settings.departmentName;
 
-      if (isHeadOfDept) {
-        currentRole = UserRoleType.director;
-      }
+      currentRole = isHeadOfDept
+          ? UserRoleType.director
+          : UserRoleType.technician;
 
       // Cancel previous data subscriptions
       for (final s in _subs.skip(1)) {
@@ -121,6 +121,10 @@ class AppProvider extends ChangeNotifier {
         phoneDirectory = list;
         notifyListeners();
       }));
+      _subs.add(_firebase.networkSwitchesStream().listen((list) {
+        networkSwitches = list;
+        notifyListeners();
+      }));
       _subs.add(_firebase.telecomNetworksStream().listen((list) {
         telecomNetworks = list;
         notifyListeners();
@@ -138,7 +142,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   void _clearData() {
+    headEmail = FirebaseService.defaultHeadEmail;
+    currentRole = UserRoleType.technician;
     devices = [];
+    networkSwitches = [];
     custodyCards = [];
     movements = [];
     tickets = [];
@@ -169,6 +176,21 @@ class AppProvider extends ChangeNotifier {
   }
 
   // -------------------- CRUD Wrappers --------------------
+
+  Future<String?> saveNetworkSwitch(NetworkSwitch networkSwitch) async {
+    if (currentUser == null) return 'يجب تسجيل الدخول';
+    isSyncing = true;
+    notifyListeners();
+    try {
+      await _firebase.saveNetworkSwitch(networkSwitch, currentUser!, isHeadOfDept);
+      return isHeadOfDept ? null : 'تم إرسال طلب السويتش لرئيس الدائرة للاعتماد';
+    } catch (e) {
+      return 'خطأ: $e';
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
+  }
 
   Future<String?> saveDevice(Device device) async {
     if (currentUser == null) return 'يجب تسجيل الدخول';
@@ -363,6 +385,49 @@ class AppProvider extends ChangeNotifier {
       isSyncing = false;
       notifyListeners();
     }
+  }
+
+  // -------------------- Secure admin handover --------------------
+
+  Future<void> reauthenticateCurrentUser() {
+    return _firebase.reauthenticateCurrentUser();
+  }
+
+  Future<String> createAdminHandover(String invitedEmail) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    return _firebase.createAdminHandover(invitedEmail);
+  }
+
+  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() {
+    return _firebase.findMyAdminHandoverInvitation();
+  }
+
+  Future<void> acceptAdminHandover(String operationId) async {
+    await _firebase.acceptAdminHandover(operationId);
+  }
+
+  Future<void> approveAdminHandover(String operationId) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    await _firebase.approveAdminHandover(operationId);
+    headEmail = '';
+    currentRole = UserRoleType.technician;
+    notifyListeners();
+  }
+
+  Future<void> cancelAdminHandover(String operationId) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    await _firebase.cancelAdminHandover(operationId);
+  }
+
+  Future<Map<String, dynamic>> getAdminHandoverStatus(
+      String operationId) {
+    return _firebase.getAdminHandoverStatus(operationId);
   }
 
   Future<void> updateHeadEmail(String email) async {

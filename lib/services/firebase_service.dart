@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/models.dart';
@@ -10,6 +11,7 @@ class FirebaseService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: [
       'email',
@@ -17,8 +19,8 @@ class FirebaseService {
     ],
   );
 
-  static const String defaultHeadEmail = 'ferasnatof@gmail.com';
-  static const String secondaryHeadEmail = 'gfa437926@gmail.com';
+  static const String defaultHeadEmail = '';
+  static const String secondaryHeadEmail = '';
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -41,6 +43,19 @@ class FirebaseService {
       print('Google Sign-In Error: $e');
       rethrow;
     }
+  }
+
+  Future<void> reauthenticateCurrentUser() async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('يجب تسجيل الدخول أولاً.');
+    final account = await _googleSignIn.signIn();
+    if (account == null) throw StateError('تم إلغاء إعادة المصادقة.');
+    final tokens = await account.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: tokens.accessToken,
+      idToken: tokens.idToken,
+    );
+    await user.reauthenticateWithCredential(credential);
   }
 
   Future<void> signOut() async {
@@ -66,17 +81,28 @@ class FirebaseService {
 
   // -------------------- Helpers --------------------
 
+  static const Set<String> _allowedDepartmentCollections = {
+    'devices',
+    'custodyCards',
+    'movements',
+    'maintenanceTickets',
+    'auditLogs',
+    'phoneDirectory',
+    'telecomNetworks',
+    'networkSwitches',
+  };
+
   CollectionReference _deptCollection(String name) {
+    if (!_allowedDepartmentCollections.contains(name)) {
+      throw ArgumentError.value(name, 'name', 'مجموعة بيانات غير مسموح بها');
+    }
     return _db.collection('department_data').doc('telecom').collection(name);
   }
 
   bool isHeadOfDept(String? email, String headEmail) {
-    if (email == null) return false;
-    final e = email.toLowerCase();
-    // رئيس دائرة الاتصالات = مدير النظام
-    return e == headEmail.toLowerCase() ||
-        e == defaultHeadEmail.toLowerCase() ||
-        e == secondaryHeadEmail.toLowerCase();
+    if (email == null || email.isEmpty) return false;
+    final normalized = email.trim().toLowerCase();
+    return _adminEmails.contains(normalized);
   }
 
   /// مدير النظام (نفس رئيس الدائرة)
@@ -84,26 +110,90 @@ class FirebaseService {
 
   // -------------------- System Settings --------------------
 
+  List<String> _adminEmails = [];
+
   Future<SystemSettings> getSystemSettings() async {
-    final doc = await _db.collection('systemSettings').doc('headOffice').get();
-    if (doc.exists && doc.data() != null) {
-      return SystemSettings.fromMap(doc.data()!);
+    final doc = await _db.collection('system_settings').doc('telecom').get();
+    if (!doc.exists || doc.data() == null) {
+      throw StateError(
+        'إعدادات النظام غير مهيأة. أنشئ system_settings/telecom من Firebase Console أولاً.',
+      );
     }
-    // Initialize defaults
-    final defaults = SystemSettings(
-      headEmail: defaultHeadEmail,
-      departmentName: 'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
-      updatedAt: DateTime.now().toIso8601String(),
+
+    final data = doc.data()!;
+    final rawEmails = data['adminEmails'];
+    if (rawEmails is! List) {
+      throw StateError('الحقل adminEmails مفقود أو ليس قائمة.');
+    }
+    _adminEmails = rawEmails
+        .whereType<String>()
+        .map((email) => email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toSet()
+        .toList();
+
+    return SystemSettings(
+      headEmail: _adminEmails.isNotEmpty ? _adminEmails.first : '',
+      departmentName: data['departmentName'] as String? ??
+          'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
+      updatedAt: data['updatedAt']?.toString(),
     );
-    await _db.collection('systemSettings').doc('headOffice').set(defaults.toMap());
-    return defaults;
   }
 
+  // -------------------- Secure admin handover --------------------
+
+  Future<String> createAdminHandover(String invitedEmail) async {
+    final result = await _functions
+        .httpsCallable('createAdminHandover')
+        .call<Map<String, dynamic>>({'invitedEmail': invitedEmail.trim()});
+    final operationId = result.data['operationId'] as String?;
+    if (operationId == null || operationId.isEmpty) {
+      throw StateError('لم يُرجع الخادم معرّف طلب التسليم.');
+    }
+    return operationId;
+  }
+
+  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() async {
+    final result = await _functions
+        .httpsCallable('findMyAdminHandoverInvitation')
+        .call<Map<String, dynamic>>();
+    return result.data;
+  }
+
+  Future<void> acceptAdminHandover(String operationId) async {
+    await _functions.httpsCallable('acceptAdminHandover').call({
+      'operationId': operationId,
+    });
+  }
+
+  Future<void> approveAdminHandover(String operationId) async {
+    await _functions.httpsCallable('approveAdminHandover').call({
+      'operationId': operationId,
+    });
+    // The former administrator must refresh their local authorization state.
+    _adminEmails = [];
+    await _auth.currentUser?.getIdToken(true);
+  }
+
+  Future<void> cancelAdminHandover(String operationId) async {
+    await _functions.httpsCallable('cancelAdminHandover').call({
+      'operationId': operationId,
+    });
+  }
+
+  Future<Map<String, dynamic>> getAdminHandoverStatus(
+      String operationId) async {
+    final result = await _functions
+        .httpsCallable('getAdminHandoverStatus')
+        .call<Map<String, dynamic>>({'operationId': operationId});
+    return result.data;
+  }
+
+  @Deprecated('Use createAdminHandover, acceptAdminHandover and approveAdminHandover.')
   Future<void> updateHeadEmail(String email) async {
-    await _db.collection('systemSettings').doc('headOffice').set({
-      'headEmail': email,
-      'updatedAt': DateTime.now().toIso8601String(),
-    }, SetOptions(merge: true));
+    throw StateError(
+      'تغيير بريد المدير المباشر لم يعد مسموحاً. استخدم سير عمل تسليم الإدارة بموافقة المدير الحالي.',
+    );
   }
 
   // -------------------- Real-time Streams --------------------
@@ -148,6 +238,12 @@ class FirebaseService {
         );
   }
 
+  Stream<List<NetworkSwitch>> networkSwitchesStream() {
+    return _deptCollection('networkSwitches').snapshots().map(
+      (snap) => snap.docs.map((d) => NetworkSwitch.fromMap(d.data() as Map<String,dynamic>, d.id)).toList(),
+    );
+  }
+
   Stream<List<TelecomNetworkInfo>> telecomNetworksStream() {
     return _deptCollection('telecomNetworks').snapshots().map(
           (snap) => snap.docs.map((d) => TelecomNetworkInfo.fromMap(d.data() as Map<String, dynamic>, d.id)).toList(),
@@ -155,13 +251,22 @@ class FirebaseService {
   }
 
   Stream<List<PendingRequest>> pendingRequestsStream() {
-    return _db.collection('pendingRequests').snapshots().map(
-          (snap) {
-            final list = snap.docs.map((d) => PendingRequest.fromMap(d.data(), d.id)).toList();
-            list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return list;
-          },
-        );
+    final user = currentUser;
+    if (user == null) return const Stream<List<PendingRequest>>.empty();
+
+    final Query<Map<String, dynamic>> query =
+        isSystemAdmin(user.email, '') 
+            ? _db.collection('pendingRequests')
+            : _db.collection('pendingRequests')
+                .where('requesterUid', isEqualTo: user.uid);
+
+    return query.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => PendingRequest.fromMap(d.data(), d.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   // -------------------- Write Operations --------------------
@@ -264,6 +369,15 @@ class FirebaseService {
   }
 
   // Convenience wrappers
+  Future<void> saveNetworkSwitch(NetworkSwitch networkSwitch, User user, bool isHead) async {
+    await submitOrCommit(
+      targetCollection: 'networkSwitches', actionType: 'save_network_switch',
+      title: 'تسجيل/تعديل سويتش شبكة',
+      details: 'السويتش ${networkSwitch.switchNumber} - ${networkSwitch.name}',
+      payload: {'id': networkSwitch.id, ...networkSwitch.toMap()}, user: user, isHead: isHead,
+    );
+  }
+
   Future<void> saveDevice(Device device, User user, bool isHead) async {
     await submitOrCommit(
       targetCollection: 'devices',

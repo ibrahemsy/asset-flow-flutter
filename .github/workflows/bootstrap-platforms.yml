@@ -1,0 +1,44 @@
+name: Bootstrap Flutter native platforms
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: Existing branch to receive generated Flutter platform folders
+        required: true
+        default: security/firebase-rules-bootstrap
+
+permissions:
+  contents: write
+
+jobs:
+  generate-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+          fetch-depth: 0
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate native platform projects
+        run: flutter create --platforms=web,android,ios,windows,linux,macos --project-name asset_flow_flutter --no-pub .
+
+      - name: Commit platform scaffolding
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android ios web windows linux macos
+          if git diff --cached --quiet; then
+            echo "Platform scaffolding is already present; no commit needed."
+            exit 0
+          fi
+          git commit -m "build: add Flutter native platform scaffolding"
+          git push origin "HEAD:${{ inputs.target_branch }}"
