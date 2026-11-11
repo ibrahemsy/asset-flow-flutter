@@ -172,14 +172,21 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: TextButton.icon(
-                        onPressed: _busy || _operationController.text.trim().isEmpty
+                        onPressed: _busy
                             ? null
-                            : () => _run(() async {
-                                  await app.cancelAdminHandover(_operationController.text.trim());
+                            : () {
+                                final id = _operationController.text.trim();
+                                if (id.isEmpty) {
+                                  setState(() => _message = 'أدخل معرّف طلب التسليم أولاً.');
+                                  return;
+                                }
+                                _run(() async {
+                                  await app.cancelAdminHandover(id);
                                   if (mounted) {
                                     setState(() => _message = 'تم إلغاء طلب التسليم.');
                                   }
-                                }),
+                                });
+                              },
                         icon: const Icon(Icons.cancel_outlined),
                         label: const Text('إلغاء طلب التسليم'),
                       ),
@@ -196,12 +203,12 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           await Clipboard.setData(ClipboardData(text: _operationId!));
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('تم نسخ معرّف طلب التسليم')),
-                            );
-                          }
+                          if (!mounted) return;
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('تم نسخ معرّف طلب التسليم')),
+                          );
                         },
                         icon: const Icon(Icons.copy),
                         label: const Text('نسخ معرّف الطلب لمشاركته مع المدير الجديد'),
