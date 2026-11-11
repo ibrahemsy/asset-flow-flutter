@@ -632,13 +632,21 @@ class ExcelService {
   String _cellStr(Data? cell) {
     if (cell == null || cell.value == null) return '';
     final v = cell.value;
-    if (v is TextCellValue) return v.value.text ?? '';
+    if (v is TextCellValue) return _spanText(v.value);
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     if (v is DateCellValue) {
       return '${v.year}-${v.month.toString().padLeft(2, '0')}-${v.day.toString().padLeft(2, '0')}';
     }
     return v.toString();
+  }
+
+  String _spanText(TextSpan span) {
+    final buffer = StringBuffer(span.text ?? '');
+    for (final child in span.children ?? const <TextSpan>[]) {
+      buffer.write(_spanText(child));
+    }
+    return buffer.toString();
   }
 
   DeviceCategory _parseCategory(String s) {
