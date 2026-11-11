@@ -1,0 +1,58 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email is string;
+    }
+
+    function adminEmails() {
+      return get(/databases/$(database)/documents/system_settings/telecom).data.adminEmails;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/system_settings/telecom)
+        && adminEmails() is list
+        && adminEmails().hasAny([request.auth.token.email]);
+    }
+
+    // The bootstrap document must be created manually by the project owner
+    // through Firebase Console before app users sign in.
+    match /system_settings/telecom {
+      allow read: if signedIn();
+      allow create: if false;
+      allow update: if isAdmin()
+        && request.resource.data.adminEmails is list
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['adminEmails', 'departmentName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Legacy settings path used by the current Flutter client.
+    match /systemSettings/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /department_data/telecom/{collectionName}/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /pendingRequests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.requesterUid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Deny all other documents unless explicitly covered above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
