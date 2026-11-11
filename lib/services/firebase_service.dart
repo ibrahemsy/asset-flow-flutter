@@ -152,6 +152,13 @@ class FirebaseService {
     return operationId;
   }
 
+  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() async {
+    final result = await _functions
+        .httpsCallable('findMyAdminHandoverInvitation')
+        .call<Map<String, dynamic>>();
+    return result.data;
+  }
+
   Future<void> acceptAdminHandover(String operationId) async {
     await _functions.httpsCallable('acceptAdminHandover').call({
       'operationId': operationId,
