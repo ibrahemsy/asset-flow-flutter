@@ -71,12 +71,9 @@ class FirebaseService {
   }
 
   bool isHeadOfDept(String? email, String headEmail) {
-    if (email == null) return false;
-    final e = email.toLowerCase();
-    // رئيس دائرة الاتصالات = مدير النظام
-    return e == headEmail.toLowerCase() ||
-        e == defaultHeadEmail.toLowerCase() ||
-        e == secondaryHeadEmail.toLowerCase();
+    if (email == null || email.isEmpty) return false;
+    final normalized = email.trim().toLowerCase();
+    return _adminEmails.contains(normalized);
   }
 
   /// مدير النظام (نفس رئيس الدائرة)
@@ -84,26 +81,47 @@ class FirebaseService {
 
   // -------------------- System Settings --------------------
 
+  List<String> _adminEmails = [];
+
   Future<SystemSettings> getSystemSettings() async {
-    final doc = await _db.collection('systemSettings').doc('headOffice').get();
-    if (doc.exists && doc.data() != null) {
-      return SystemSettings.fromMap(doc.data()!);
+    final doc = await _db.collection('system_settings').doc('telecom').get();
+    if (!doc.exists || doc.data() == null) {
+      throw StateError(
+        'إعدادات النظام غير مهيأة. أنشئ system_settings/telecom من Firebase Console أولاً.',
+      );
     }
-    // Initialize defaults
-    final defaults = SystemSettings(
-      headEmail: defaultHeadEmail,
-      departmentName: 'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
-      updatedAt: DateTime.now().toIso8601String(),
+
+    final data = doc.data()!;
+    final rawEmails = data['adminEmails'];
+    if (rawEmails is! List) {
+      throw StateError('الحقل adminEmails مفقود أو ليس قائمة.');
+    }
+    _adminEmails = rawEmails
+        .whereType<String>()
+        .map((email) => email.trim().toLowerCase())
+        .where((email) => email.isNotEmpty)
+        .toSet()
+        .toList();
+
+    return SystemSettings(
+      headEmail: _adminEmails.isNotEmpty ? _adminEmails.first : '',
+      departmentName: data['departmentName'] as String? ??
+          'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
+      updatedAt: data['updatedAt']?.toString(),
     );
-    await _db.collection('systemSettings').doc('headOffice').set(defaults.toMap());
-    return defaults;
   }
 
   Future<void> updateHeadEmail(String email) async {
-    await _db.collection('systemSettings').doc('headOffice').set({
-      'headEmail': email,
+    final normalized = email.trim().toLowerCase();
+    if (normalized.isEmpty || !normalized.contains('@')) {
+      throw ArgumentError.value(email, 'email', 'عنوان بريد غير صالح');
+    }
+    final admins = {..._adminEmails, normalized}.toList();
+    await _db.collection('system_settings').doc('telecom').set({
+      'adminEmails': admins,
       'updatedAt': DateTime.now().toIso8601String(),
     }, SetOptions(merge: true));
+    _adminEmails = admins;
   }
 
   // -------------------- Real-time Streams --------------------
@@ -155,13 +173,22 @@ class FirebaseService {
   }
 
   Stream<List<PendingRequest>> pendingRequestsStream() {
-    return _db.collection('pendingRequests').snapshots().map(
-          (snap) {
-            final list = snap.docs.map((d) => PendingRequest.fromMap(d.data(), d.id)).toList();
-            list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-            return list;
-          },
-        );
+    final user = currentUser;
+    if (user == null) return const Stream<List<PendingRequest>>.empty();
+
+    final Query<Map<String, dynamic>> query =
+        isSystemAdmin(user.email, '') 
+            ? _db.collection('pendingRequests')
+            : _db.collection('pendingRequests')
+                .where('requesterUid', isEqualTo: user.uid);
+
+    return query.snapshots().map((snap) {
+      final list = snap.docs
+          .map((d) => PendingRequest.fromMap(d.data(), d.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   // -------------------- Write Operations --------------------
