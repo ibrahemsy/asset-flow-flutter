@@ -366,6 +366,10 @@ class AppProvider extends ChangeNotifier {
 
   // -------------------- Secure admin handover --------------------
 
+  Future<void> reauthenticateCurrentUser() {
+    return _firebase.reauthenticateCurrentUser();
+  }
+
   Future<String> createAdminHandover(String invitedEmail) async {
     if (!isHeadOfDept) {
       throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
