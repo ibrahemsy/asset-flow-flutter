@@ -23,8 +23,8 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate missing Web platform scaffolding
-        run: flutter create --platforms=web --no-pub . && rm -f test/widget_test.dart
+      - name: Generate missing Web and Android platform scaffolding
+        run: flutter create --platforms=web,android --no-pub . && rm -f test/widget_test.dart
 
       - name: Install dependencies
         run: flutter pub get
