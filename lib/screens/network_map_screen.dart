@@ -97,7 +97,7 @@ class NetworkMapScreen extends StatelessWidget {
     final n = int.tryParse(count.text.trim());
     if (number.text.trim().isEmpty || n == null || n < 1 || n > 96) { _message(context, 'أدخل رقم سويتش وعدداً صحيحاً للمنافذ بين 1 و96'); return; }
     if (app.networkSwitches.any((s) => s.switchNumber.toLowerCase() == number.text.trim().toLowerCase() && s.id != existing?.id)) { _message(context, 'رقم السويتش مستخدم مسبقاً'); return; }
-    if (existing != null && n < existing.ports.where((p) => int.tryParse(p.portNumber) != null && int.parse(p.portNumber) > n).length) { _message(context, 'لا يمكن تقليل عدد المنافذ قبل نقل أو حذف التوصيلات الواقعة خارج النطاق'); return; }
+    if (existing != null && (existing.ports.any((p) => (int.tryParse(p.portNumber) ?? 0) > n && ((p.pointNumber ?? '').isNotEmpty || (p.connectedDeviceId ?? '').isNotEmpty)) || app.devices.any((d) => d.switchId == existing.id && (int.tryParse(d.switchPortNumber ?? '') ?? 0) > n))) { _message(context, 'لا يمكن تقليل عدد المنافذ قبل نقل أو حذف التوصيلات الواقعة خارج النطاق'); return; }
     final now = DateTime.now().toIso8601String();
     final item = NetworkSwitch(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), switchNumber: number.text.trim(), name: name.text.trim(), floor: floor, location: location.text.trim(), portCount: n, connectionType: path, ports: existing?.ports ?? const [], notes: existing?.notes ?? '', createdAt: existing?.createdAt ?? now, updatedAt: now);
     final result = await app.saveNetworkSwitch(item);
@@ -114,7 +114,7 @@ class NetworkMapScreen extends StatelessWidget {
     ));
     if (ok != true) return;
     final value = point.text.trim();
-    if (value.isNotEmpty && sw.ports.any((p) => p.portNumber != portNumber && p.pointNumber?.trim().toLowerCase() == value.toLowerCase())) { _message(context, 'رقم النقطة مرتبط بمنفذ آخر في هذا السويتش'); return; }
+    if (value.isNotEmpty && app.networkSwitches.any((item) => item.ports.any((p) => !(item.id == sw.id && p.portNumber == portNumber) && p.pointNumber?.trim().toLowerCase() == value.toLowerCase()))) { _message(context, 'رقم النقطة مرتبط مسبقاً بمنفذ آخر'); return; }
     final ports = sw.ports.where((p) => p.portNumber != portNumber).toList()..add(NetworkSwitchPort(portNumber: portNumber, pointNumber: value.isEmpty ? null : value, connectedDeviceId: old?.connectedDeviceId, notes: old?.notes));
     final updated = NetworkSwitch(id: sw.id, switchNumber: sw.switchNumber, name: sw.name, floor: sw.floor, location: sw.location, portCount: sw.portCount, connectionType: sw.connectionType, ports: ports, notes: sw.notes, createdAt: sw.createdAt, updatedAt: DateTime.now().toIso8601String());
     final result = await app.saveNetworkSwitch(updated);
