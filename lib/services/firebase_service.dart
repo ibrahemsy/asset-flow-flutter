@@ -19,8 +19,8 @@ class FirebaseService {
     ],
   );
 
-  static const String defaultHeadEmail = 'ferasnatof@gmail.com';
-  static const String secondaryHeadEmail = 'gfa437926@gmail.com';
+  static const String defaultHeadEmail = '';
+  static const String secondaryHeadEmail = '';
 
   User? get currentUser => _auth.currentUser;
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -162,17 +162,11 @@ class FirebaseService {
     return result.data;
   }
 
+  @Deprecated('Use createAdminHandover, acceptAdminHandover and approveAdminHandover.')
   Future<void> updateHeadEmail(String email) async {
-    final normalized = email.trim().toLowerCase();
-    if (normalized.isEmpty || !normalized.contains('@')) {
-      throw ArgumentError.value(email, 'email', 'عنوان بريد غير صالح');
-    }
-    final admins = {..._adminEmails, normalized}.toList();
-    await _db.collection('system_settings').doc('telecom').set({
-      'adminEmails': admins,
-      'updatedAt': DateTime.now().toIso8601String(),
-    }, SetOptions(merge: true));
-    _adminEmails = admins;
+    throw StateError(
+      'تغيير بريد المدير المباشر لم يعد مسموحاً. استخدم سير عمل تسليم الإدارة بموافقة المدير الحالي.',
+    );
   }
 
   // -------------------- Real-time Streams --------------------
