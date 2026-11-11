@@ -4,6 +4,10 @@
 
 هذا المستودع يحتاج إعداد Firebase خاصاً بمالك المشروع قبل التشغيل. لا تضع مفاتيح الخدمة الخاصة أو مفاتيح Admin SDK داخل التطبيق أو GitHub. ملف `lib/firebase_options.dart` يُولّد محلياً بواسطة FlutterFire CLI ولا ينبغي استبداله بقيم تخمينية.
 
+## دليل المدير
+
+لخطوات Firebase التفصيلية من منظور مدير النظام، راجع [دليل مدير النظام لربط Firebase](docs/FIREBASE_ADMIN_BOOTSTRAP_AR.md).
+
 ## 1. المتطلبات
 
 - Flutter SDK متوافق مع قيود `pubspec.yaml`
