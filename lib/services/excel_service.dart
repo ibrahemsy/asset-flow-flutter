@@ -692,7 +692,7 @@ class ExcelService {
     final bytes = excel.encode();
     if (bytes == null) return null;
 
-    return saveExcelBytes(bytes, filename);
+    return saveExcelBytes(Uint8List.fromList(bytes), filename);
   }
 }
 
