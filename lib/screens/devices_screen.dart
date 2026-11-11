@@ -400,6 +400,23 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         );
                         return;
                       }
+                      if (selectedSwitchId != null) {
+                        final selectedSwitch = app.networkSwitches.where((sw) => sw.id == selectedSwitchId).firstOrNull;
+                        final port = int.tryParse(switchPortCtrl.text.trim());
+                        if (selectedSwitch == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('السويتش المحدد غير موجود')));
+                          return;
+                        }
+                        if (port == null || port < 1 || port > selectedSwitch.portCount) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('أدخل رقم منفذ بين 1 و${selectedSwitch.portCount}')));
+                          return;
+                        }
+                        final occupied = app.devices.any((item) => item.id != existing?.id && item.switchId == selectedSwitchId && item.switchPortNumber == port.toString());
+                        if (occupied) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا المنفذ مرتبط بحاسب آخر على السويتش نفسه')));
+                          return;
+                        }
+                      }
                       final now = DateTime.now().toIso8601String();
                       final device = Device(
                         id: existing?.id ?? const Uuid().v4(),
