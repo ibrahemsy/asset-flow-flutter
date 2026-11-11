@@ -144,12 +144,8 @@ export const approveAdminHandover = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "تعذر التحقق من حساب المدير الجديد وبريده الموثق.");
   }
 
-  // Set the claim first. Firestore authorization remains with the old UID until
-  // the following transaction atomically changes currentAdminUid.
-  await auth.setCustomUserClaims(nextUser.uid, {
-    ...nextUser.customClaims, role: "system_admin", department: "telecom"
-  });
-
+  // Firestore ownership is switched atomically first. Custom claims are
+  // supplementary UI/server metadata; Firestore rules use currentAdminUid.
   await db.runTransaction(async (tx) => {
     const [settingsSnap, currentRequest] = await Promise.all([
       tx.get(settingsRef), tx.get(handoverRef)
@@ -187,6 +183,12 @@ export const approveAdminHandover = onCall(async (request) => {
       fromAdminUid: caller.uid, toAdminUid: nextUser.uid,
       actorUid: caller.uid, timestamp: FieldValue.serverTimestamp()
     });
+  });
+
+  // Set the new administrator's supplementary role claim only after the
+  // authoritative UID switch has committed successfully.
+  await auth.setCustomUserClaims(nextUser.uid, {
+    ...nextUser.customClaims, role: "system_admin", department: "telecom"
   });
 
   // Cleanup is best-effort: the authoritative Firestore UID has already moved,
