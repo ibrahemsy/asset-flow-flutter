@@ -88,6 +88,7 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
     );
     if (confirmed != true) return;
     await _run(() async {
+      await app.reauthenticateCurrentUser();
       await app.approveAdminHandover(id);
       if (mounted) setState(() => _message = 'اكتمل التسليم. لم يعد حسابك الحالي يملك صلاحيات المدير.');
     });
