@@ -85,6 +85,32 @@ export const createAdminHandover = onCall(async (request) => {
   return { operationId: ref.id, status: "awaiting_new_admin_acceptance" };
 });
 
+export const findMyAdminHandoverInvitation = onCall(async (request) => {
+  const caller = requireAuth(request.auth);
+  const email = normalizeEmail(caller.token.email);
+  if (caller.token.email_verified !== true) {
+    throw new HttpsError("failed-precondition", "يجب توثيق بريد الحساب أولاً.");
+  }
+  const snapshot = await requests
+    .where("invitedEmail", "==", email)
+    .where("status", "==", "awaiting_new_admin_acceptance")
+    .limit(2)
+    .get();
+  if (snapshot.empty) {
+    throw new HttpsError("not-found", "لا توجد دعوة تسليم معلقة لهذا البريد.");
+  }
+  if (snapshot.size > 1) {
+    throw new HttpsError("failed-precondition", "توجد أكثر من دعوة؛ راجع مالك النظام.");
+  }
+  const doc = snapshot.docs[0];
+  return {
+    operationId: doc.id,
+    fromAdminEmail: doc.get("fromAdminEmail") ?? "",
+    invitedEmail: email,
+    requestedAt: doc.get("requestedAt")?.toDate?.()?.toISOString?.() ?? null
+  };
+});
+
 export const acceptAdminHandover = onCall(async (request) => {
   const caller = requireAuth(request.auth);
   const email = normalizeEmail(caller.token.email);
