@@ -167,6 +167,12 @@ class FirebaseService {
     await _auth.currentUser?.getIdToken(true);
   }
 
+  Future<void> cancelAdminHandover(String operationId) async {
+    await _functions.httpsCallable('cancelAdminHandover').call({
+      'operationId': operationId,
+    });
+  }
+
   Future<Map<String, dynamic>> getAdminHandoverStatus(
       String operationId) async {
     final result = await _functions
