@@ -6,27 +6,28 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email is string;
     }
 
-    function adminEmails() {
-      return get(/databases/$(database)/documents/system_settings/telecom).data.adminEmails;
+    function settingsData() {
+      return get(/databases/$(database)/documents/system_settings/telecom).data;
     }
 
     function isAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/system_settings/telecom)
-        && adminEmails() is list
-        && adminEmails().hasAny([request.auth.token.email]);
+        && (
+          ('currentAdminUid' in settingsData()
+            && settingsData().currentAdminUid == request.auth.uid)
+          ||
+          (!('currentAdminUid' in settingsData())
+            && settingsData().adminEmails is list
+            && settingsData().adminEmails.hasAny([request.auth.token.email]))
+        );
     }
 
-    // The bootstrap document must be created manually by the project owner
-    // through Firebase Console before app users sign in.
+    // The bootstrap document is created by the project owner.
+    // After bootstrap, only trusted Cloud Functions may change admin ownership.
     match /system_settings/telecom {
       allow read: if signedIn();
-      allow create: if false;
-      allow update: if isAdmin()
-        && request.resource.data.adminEmails is list
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['adminEmails', 'departmentName', 'updatedAt']);
-      allow delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /department_data/telecom/{collectionName}/{documentId} {
@@ -52,11 +53,18 @@ service cloud.firestore {
         && request.resource.data.payload is map;
       allow read: if isAdmin()
         || (signedIn() && resource.data.requesterUid == request.auth.uid);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow update, delete: if isAdmin();
     }
 
-    // Deny all other documents unless explicitly covered above.
+    // Admin handover documents are accessed only through callable functions.
+    // Admin SDK bypasses these client security rules.
+    match /adminHandoverRequests/{requestId} {
+      allow read, write: if false;
+    }
+    match /adminHandoverAudit/{eventId} {
+      allow read, write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
