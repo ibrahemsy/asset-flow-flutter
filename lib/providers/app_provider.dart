@@ -51,8 +51,7 @@ class AppProvider extends ChangeNotifier {
 
   /// رئيس دائرة الاتصالات = مدير النظام
   bool get isHeadOfDept =>
-      _backend.isSystemAdmin(currentUser?.email) ||
-      _firebase.isHeadOfDept(currentUser?.email, headEmail);
+      _firebase.isSystemAdmin(currentUser?.email, headEmail);
 
   /// مدير النظام (نفس رئيس الدائرة — صلاحيات كاملة)
   bool get isSystemAdmin => isHeadOfDept;
