@@ -67,6 +67,19 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
     });
   }
 
+  Future<void> _findInvitation(AppProvider app) async {
+    await _run(() async {
+      final invitation = await app.findMyAdminHandoverInvitation();
+      final id = invitation['operationId'] as String;
+      if (!mounted) return;
+      setState(() {
+        _operationId = id;
+        _operationController.text = id;
+        _message = 'تم العثور على دعوة من ${invitation['fromAdminEmail'] ?? 'المدير الحالي'}، ويمكنك الآن قبول استلام الإدارة.';
+      });
+    });
+  }
+
   Future<void> _approve(AppProvider app) async {
     final id = _operationController.text.trim();
     if (id.isEmpty) {
@@ -150,6 +163,15 @@ class _AdminHandoverScreenState extends State<AdminHandoverScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  if (!isCurrentAdmin)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : () => _findInvitation(app),
+                        icon: const Icon(Icons.mark_email_unread_outlined),
+                        label: const Text('البحث عن دعوة موجهة إلى بريدي'),
+                      ),
+                    ),
                   if (!isCurrentAdmin)
                     SizedBox(
                       width: double.infinity,
