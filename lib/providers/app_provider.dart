@@ -391,6 +391,13 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> cancelAdminHandover(String operationId) async {
+    if (!isHeadOfDept) {
+      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
+    }
+    await _firebase.cancelAdminHandover(operationId);
+  }
+
   Future<Map<String, dynamic>> getAdminHandoverStatus(
       String operationId) {
     return _firebase.getAdminHandoverStatus(operationId);
