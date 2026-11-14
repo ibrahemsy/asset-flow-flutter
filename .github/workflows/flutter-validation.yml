@@ -43,6 +43,17 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Commit resolved dependency lockfile to feature branch
+        if: github.ref_name == 'feature/supabase-admin-handover'
+        run: |
+          if [ -n "$(git status --porcelain pubspec.lock)" ]; then
+            git add pubspec.lock
+            git commit -m "build: commit resolved Flutter dependency lockfile"
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase FETCH_HEAD
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
       - name: Static analysis
         run: flutter analyze --no-pub --no-fatal-infos
 
