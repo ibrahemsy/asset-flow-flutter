@@ -7,6 +7,11 @@ class SupabaseService {
   factory SupabaseService() => _instance;
   SupabaseService._internal();
 
+  static const Set<String> _allowedOperationalTables = {
+    'devices', 'custody_cards', 'movements', 'maintenance_tickets',
+    'phone_directory', 'telecom_networks',
+  };
+
   SupabaseClient get _client => Supabase.instance.client;
   User? get currentUser => _client.auth.currentUser;
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
@@ -157,6 +162,9 @@ class SupabaseService {
     required Map<String, dynamic> payload,
     String? targetDocId,
   }) async {
+    if (!_allowedOperationalTables.contains(table)) {
+      throw ArgumentError('جدول غير مسموح ضمن عمليات التطبيق: $table');
+    }
     final admin = await isSystemAdmin();
     if (admin) {
       final id = payload['id'] ?? targetDocId;
@@ -371,6 +379,9 @@ class SupabaseService {
   Future<void> approveRequest(PendingRequest req) async {
     if (!await isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
     final table = req.targetCollection;
+    if (!_allowedOperationalTables.contains(table)) {
+      throw ArgumentError('جدول الطلب غير مسموح: $table');
+    }
     final id = req.targetDocId ?? req.payload['id'];
     if (req.actionType.startsWith('delete') && id != null) {
       await _client.from(table).delete().eq('id', id);
