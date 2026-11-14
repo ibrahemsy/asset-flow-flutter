@@ -111,7 +111,7 @@ class MovementsScreen extends StatelessWidget {
                         barcode: selectedDevice!.barcode,
                         fromEntity: fromCtrl.text.trim(),
                         toEntity: toCtrl.text.trim(),
-                        executorName: app.currentUser?.displayName ?? '',
+                        executorName: app.currentUserName ?? '',
                         date: now.split('T').first,
                         reason: reasonCtrl.text.trim(),
                         createdAt: now,
