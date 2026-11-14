@@ -7,6 +7,14 @@ import '../services/catalog_service.dart';
 import '../services/excel_service.dart';
 import '../services/sheets_service.dart';
 
+/// واجهة مستخدم بسيطة بدل Firebase User للشاشات القديمة
+class AppUserView {
+  final String? email;
+  final String? displayName;
+  final String? uid;
+  const AppUserView({this.email, this.displayName, this.uid});
+}
+
 /// مزوّد الحالة — مسار Supabase فقط (بدون تهيئة Firebase على الويب)
 class AppProvider extends ChangeNotifier {
   final SupabaseService _supabase = SupabaseService();
@@ -54,6 +62,18 @@ class AppProvider extends ChangeNotifier {
       supabaseEmail != null && supabaseEmail!.isNotEmpty;
 
   String? get activeEmail => supabaseEmail;
+
+  /// متوافق مع الشاشات التي كانت تستخدم Firebase User
+  AppUserView? get currentUser {
+    if (!isLoggedIn) return null;
+    return AppUserView(
+      email: supabaseEmail,
+      displayName: (supabaseName != null && supabaseName!.isNotEmpty)
+          ? supabaseName
+          : (supabaseEmail?.split('@').first ?? 'مستخدم'),
+      uid: supabaseUid,
+    );
+  }
 
   bool get isHeadOfDept => _backend.isSystemAdmin(activeEmail);
 
@@ -429,6 +449,39 @@ class AppProvider extends ChangeNotifier {
     await _backend.addAdminEmail(email);
     headEmail = email;
     notifyListeners();
+  }
+
+  // ---- دوال تسليم الإدارة (كانت على Firebase Functions) ----
+  // على Supabase تُعرض رسالة توضيحية حتى يُبنى مسار بديل
+
+  Future<void> reauthenticateCurrentUser() async {
+    // لا حاجة لإعادة مصادقة Firebase في مسار Supabase
+  }
+
+  Future<String> createAdminHandover(String invitedEmail) async {
+    throw StateError(
+      'تسليم الإدارة عبر Cloud Functions غير مفعّل مع Supabase حالياً. أضف البريد من إعدادات المدير محلياً.',
+    );
+  }
+
+  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() async {
+    return {'found': false};
+  }
+
+  Future<void> acceptAdminHandover(String operationId) async {
+    throw StateError('غير متاح مع Supabase حالياً');
+  }
+
+  Future<void> approveAdminHandover(String operationId) async {
+    throw StateError('غير متاح مع Supabase حالياً');
+  }
+
+  Future<void> cancelAdminHandover(String operationId) async {
+    throw StateError('غير متاح مع Supabase حالياً');
+  }
+
+  Future<Map<String, dynamic>> getAdminHandoverStatus(String operationId) async {
+    return {'status': 'unavailable'};
   }
 
   @override
