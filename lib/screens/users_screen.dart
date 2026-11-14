@@ -93,7 +93,7 @@ class _UsersScreenState extends State<UsersScreen> {
               title: const Text('معلومات'),
               subtitle: Text(
                 'الدور: مدير النظام\n'
-                'الخلفية: ${_cfg.isSupabase ? "Supabase" : "Firebase"}\n'
+                'الخلفية: Supabase\n'
                 'القسم: ${app.departmentName}',
               ),
               isThreeLine: true,
