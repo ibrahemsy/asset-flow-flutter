@@ -4,12 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/catalog_service.dart';
 import '../services/excel_service.dart';
+import '../services/sheets_service.dart';
 import '../services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final SupabaseService _supabase = SupabaseService();
   final CatalogService catalog = CatalogService();
   final ExcelService _excel = ExcelService();
+  final SheetsService _sheets = SheetsService();
 
   User? currentUser;
   UserRoleType currentRole = UserRoleType.technician;
@@ -179,6 +181,19 @@ class AppProvider extends ChangeNotifier {
   }
   Future<ImportResult<Device>> importDevicesExcel() => _excel.importDevicesFromFile();
   Future<ImportResult<CustodyCard>> importCustodyExcel() => _excel.importCustodyCardsFromFile();
+
+  Future<SheetsExportResult> exportToGoogleSheets() => _sheets.exportInventoryToGoogleSheets(
+    title: 'جرد الأصول والعهدة - دائرة الاتصالات',
+    devices: devices,
+    custodyCards: custodyCards,
+  );
+
+  Future<SheetsExportResult> exportFullToGoogleSheets() => _sheets.exportFullReportToSheets(
+    devices: devices,
+    cards: custodyCards,
+    movements: movements,
+    tickets: tickets,
+  );
 
   @override
   void dispose() { _authSubscription?.cancel(); super.dispose(); }
