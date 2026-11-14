@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -319,7 +320,50 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   const SizedBox(height: 10),
                   TextField(controller: serialCtrl, decoration: const InputDecoration(labelText: 'الرقم التسلسلي *')),
                   const SizedBox(height: 10),
-                  TextField(controller: barcodeCtrl, decoration: const InputDecoration(labelText: 'الباركود / QR')),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: barcodeCtrl,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'الباركود / QR',
+                            helperText: 'يدعم قارئ USB الذي يعمل كلوحة مفاتيح؛ امسح الرمز والمؤشر داخل الحقل.',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: 'مسح بالكاميرا',
+                        icon: const Icon(Icons.qr_code_scanner),
+                        onPressed: () async {
+                          final scanned = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            builder: (scanContext) => SizedBox(
+                              height: MediaQuery.of(scanContext).size.height * 0.72,
+                              child: MobileScanner(
+                                onDetect: (capture) {
+                                  final values = capture.barcodes
+                                      .map((barcode) => barcode.rawValue)
+                                      .whereType<String>()
+                                      .where((value) => value.isNotEmpty);
+                                  if (values.isNotEmpty && scanContext.mounted) {
+                                    Navigator.of(scanContext).pop(values.first);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                          if (scanned != null) {
+                            setModalState(() => barcodeCtrl.text = scanned);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   TextField(controller: assetCtrl, decoration: const InputDecoration(labelText: 'رقم الأصل / العهدة')),
                   const SizedBox(height: 10),
