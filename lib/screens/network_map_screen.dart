@@ -1,228 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
-import '../utils/app_theme.dart';
 import '../models/models.dart';
 
-/// رسم هيكل الشبكة: إنترنت → ألياف → سيرفرات → سويتشات → مكاتب + شبكة المقاسم
 class NetworkMapScreen extends StatelessWidget {
   const NetworkMapScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final computers = app.devices.where((d) => d.category == DeviceCategory.desktop || d.category == DeviceCategory.laptop).toList();
+    final internal = computers.where((d) => d.networkConnection == 'internalServer').length;
+    final external = computers.where((d) => d.networkConnection == 'externalInternet').length;
+    final unset = computers.where((d) => d.networkConnection == null || d.networkConnection!.isEmpty).length;
+    return Scaffold(backgroundColor: const Color(0xFF0F172A),
+      body: ListView(padding: const EdgeInsets.all(14), children: [
+        const Text('مخطط الشبكة والسويتشات', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _stat('السويتشات', app.networkSwitches.length, Colors.cyanAccent),
+          _stat('سيرفر داخلي', internal, Colors.lightGreenAccent),
+          _stat('إنترنت خارجي', external, Colors.orangeAccent),
+          _stat('غير محدد', unset, Colors.amberAccent),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [const Expanded(child: Text('سجل السويتشات المستقل', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
+          FilledButton.icon(onPressed: () => _editSwitch(context), icon: const Icon(Icons.add), label: const Text('إضافة سويتش'))]),
+        const SizedBox(height: 8),
+        if (app.networkSwitches.isEmpty) const Text('لم تتم إضافة سويتشات بعد.', style: TextStyle(color: Colors.white54))
+        else ...app.networkSwitches.map((sw) => _switchCard(context, sw, app)),
+        const SizedBox(height: 16),
+        const Text('أجهزة الحواسيب', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        ...computers.map((d) => Card(color: const Color(0xFF1E293B), child: ListTile(
+          leading: const Icon(Icons.desktop_windows, color: Colors.cyanAccent),
+          title: Text(d.name, style: const TextStyle(color: Colors.white)),
+          subtitle: Text('${d.networkConnection ?? 'لم يحدد المسار'} • ${d.switchNumber ?? 'لم يربط بسويتش'} • المنفذ ${d.switchPortNumber ?? '—'}', style: const TextStyle(color: Colors.white60)),
+        ))),
+        const SizedBox(height: 12),
+        const Text('ملاحظة: رقم النقطة الشبكية يمكن تركه فارغاً وإضافته لاحقاً إلى منفذ السويتش. المخطط يعرض البيانات المسجلة ولا يؤكد حالة الاتصال الحية.', style: TextStyle(color: Colors.white38, fontSize: 11)),
+      ]),
+    );
+  }
 
-    final servers = app.devices.where((d) =>
-        d.name.contains('سيرفر') || d.name.toLowerCase().contains('server')).toList();
-    final switches = app.devices.where((d) => d.category == DeviceCategory.switchDevice).toList();
-    final routers = app.devices.where((d) => d.category == DeviceCategory.router).toList();
-    final aps = app.devices.where((d) => d.category == DeviceCategory.accessPoint).toList();
-    final fiber = app.devices.where((d) => d.category == DeviceCategory.cablesFiber).toList();
-    final phones = app.phoneDirectory;
-    final networks = app.telecomNetworks;
+  Widget _stat(String label, int value, Color color) => Container(padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: const Color(0xFF1E293B), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withOpacity(.3))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$value', style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)), Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10))]));
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
+  Widget _switchCard(BuildContext context, NetworkSwitch sw, AppProvider app) {
+    final used = app.devices.where((d) => d.switchId == sw.id && (d.switchPortNumber ?? '').isNotEmpty).length;
+    final pointsMissing = sw.ports.where((p) => p.pointNumber == null || p.pointNumber!.trim().isEmpty).length;
+    return Card(color: const Color(0xFF1E293B), margin: const EdgeInsets.only(bottom: 10),
+      child: ExpansionTile(leading: const Icon(Icons.device_hub, color: Colors.cyanAccent),
+        title: Text('السويتش ${sw.switchNumber} — ${sw.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        subtitle: Text('${sw.floor} • ${sw.portCount} منفذ • مستخدم $used • نقاط غير معرفة $pointsMissing', style: const TextStyle(color: Colors.white60, fontSize: 11)),
         children: [
-          Row(
-            children: [
-              const Icon(Icons.hub_rounded, color: Colors.cyanAccent, size: 22),
-              const SizedBox(width: 8),
-              const Text('هيكل الشبكة', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              _dot(Colors.orangeAccent, 'نت'),
-              _dot(Colors.purpleAccent, 'ألياف'),
-              _dot(Colors.cyanAccent, 'سيرفر'),
-              _dot(Colors.lightGreenAccent, 'سويتش'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          _layer('الإنترنت / البوابة', Icons.public_rounded, Colors.orangeAccent, Column(children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                _node(Icons.cloud_rounded, 'مزود الخدمة\nISP', Colors.orangeAccent),
-                _node(Icons.router_rounded, 'راوتر رئيسي\nGateway', Colors.amber),
-                ...routers.take(2).map((r) => _node(Icons.router_rounded, r.name, Colors.orange, sub: r.ipAddress)),
-              ]),
-            ),
-            _arrow('اتصال إنترنت'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [
+            Expanded(child: Text('الموقع: ${sw.location} | ${sw.connectionType == 'internalServer' ? 'سيرفر داخلي' : 'إنترنت خارجي'}', style: const TextStyle(color: Colors.white54, fontSize: 11))),
+            TextButton.icon(onPressed: () => _editSwitch(context, existing: sw), icon: const Icon(Icons.edit, size: 16), label: const Text('تعديل')),
           ])),
-
-          _layer('الكابلات الضوئية (Fiber)', Icons.cable_rounded, Colors.purpleAccent, Column(children: [
-            if (fiber.isEmpty)
-              const Text('لا كابلات مسجّلة — أضفها من الأجهزة', style: TextStyle(color: Colors.white38, fontSize: 12))
-            else
-              Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: fiber.map((f) => _node(Icons.cable_rounded, f.name, Colors.purpleAccent, sub: f.location)).toList()),
-            _arrow('نقل ضوئي'),
-          ])),
-
-          _layer('السيرفرات الداخلية', Icons.dns_rounded, Colors.cyanAccent, Column(children: [
-            if (servers.isEmpty && networks.where((n) => n.type.contains('خادم')).isEmpty)
-              const Text('لا سيرفرات مسجّلة', style: TextStyle(color: Colors.white38, fontSize: 12))
-            else
-              Wrap(spacing: 10, runSpacing: 10, alignment: WrapAlignment.center, children: [
-                ...servers.map((s) => _node(Icons.dns_rounded, s.name, Colors.cyanAccent, sub: s.ipAddress ?? s.location)),
-                ...networks.where((n) => n.type.contains('خادم') || n.name.toLowerCase().contains('server')).map((n) => _node(Icons.storage_rounded, n.name, Colors.tealAccent, sub: n.ipRange ?? n.location)),
-              ]),
-            _arrow('LAN'),
-          ])),
-
-          _layer('السويتشات ونقاط البث', Icons.device_hub_rounded, Colors.lightGreenAccent, Column(children: [
-            if (switches.isEmpty && aps.isEmpty)
-              const Text('لا سويتشات / AP', style: TextStyle(color: Colors.white38, fontSize: 12))
-            else
-              Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [
-                ...switches.map((s) => _node(Icons.device_hub_rounded, s.name, Colors.lightGreenAccent, sub: '${s.portsCount ?? "?"} منفذ')),
-                ...aps.map((a) => _node(Icons.wifi_rounded, a.name, Colors.greenAccent, sub: a.location)),
-              ]),
-            _arrow('إلى المكاتب'),
-          ])),
-
-          _layer('شبكة المقاسم الأرضية (PBX)', Icons.phone_in_talk_rounded, Colors.amberAccent, Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(child: _node(Icons.settings_phone_rounded, 'المقسم المركزي\nPBX', Colors.amberAccent, large: true)),
-              const SizedBox(height: 12),
-              if (phones.isEmpty)
-                const Text('لا أرقام في دليل الهواتف', style: TextStyle(color: Colors.white38, fontSize: 12), textAlign: TextAlign.center)
-              else
-                ..._group(phones).entries.map((e) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Icon(Icons.apartment_rounded, size: 14, color: Colors.white54),
-                      const SizedBox(width: 4),
-                      Text(e.key, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text(' (${e.value.length})', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Wrap(spacing: 6, runSpacing: 6, children: e.value.map((p) {
-                      final active = p.status == 'active';
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: active ? Colors.amber.withOpacity(0.15) : Colors.white10,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: active ? Colors.amberAccent.withOpacity(0.5) : Colors.white12),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.phone_rounded, size: 12, color: active ? Colors.amberAccent : Colors.white38),
-                          const SizedBox(width: 4),
-                          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(p.phoneNumber, style: TextStyle(color: active ? Colors.white : Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-                            Text(p.employeeName.length > 14 ? '${p.employeeName.substring(0, 14)}…' : p.employeeName, style: const TextStyle(color: Colors.white54, fontSize: 9)),
-                          ]),
-                          if (p.pbxPortNumber.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Text('P${p.pbxPortNumber}', style: const TextStyle(color: Colors.white38, fontSize: 9)),
-                          ],
-                        ]),
-                      );
-                    }).toList()),
-                  ]),
-                )),
-            ],
-          )),
-
-          if (networks.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            const Text('الشبكات المسجّلة', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            ...networks.map((n) => Card(
-              color: const Color(0xFF1E293B),
-              child: ListTile(
-                dense: true,
-                leading: Icon(Icons.lan_rounded, color: n.status == 'active' ? Colors.lightGreenAccent : Colors.redAccent),
-                title: Text(n.name, style: const TextStyle(color: Colors.white, fontSize: 13)),
-                subtitle: Text('${n.type} • ${n.location}${n.ipRange != null ? ' • ${n.ipRange}' : ''}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-              ),
-            )),
-          ],
+          ...List.generate(sw.portCount, (index) {
+            final number = '${index + 1}';
+            final port = sw.ports.where((p) => p.portNumber == number).firstOrNull;
+            final device = app.devices.where((d) => d.switchId == sw.id && d.switchPortNumber == number).firstOrNull;
+            return ListTile(dense: true, leading: Icon(device == null ? Icons.radio_button_unchecked : Icons.link, color: device == null ? Colors.white38 : Colors.lightGreenAccent),
+              title: Text('منفذ $number', style: const TextStyle(color: Colors.white)),
+              subtitle: Text('النقطة: ${port?.pointNumber?.isNotEmpty == true ? port!.pointNumber : 'غير محددة'} • ${device?.name ?? 'غير مربوط بحاسب'}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+              trailing: IconButton(tooltip: 'إضافة أو تعديل رقم النقطة', icon: const Icon(Icons.edit_note, color: Colors.cyanAccent), onPressed: () => _editPoint(context, sw, number, port)),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Map<String, List<PhoneDirectoryEntry>> _group(List<PhoneDirectoryEntry> phones) {
-    final map = <String, List<PhoneDirectoryEntry>>{};
-    for (final p in phones) {
-      map.putIfAbsent(p.department.isEmpty ? 'عام' : p.department, () => []).add(p);
-    }
-    return map;
+  Future<void> _editSwitch(BuildContext context, {NetworkSwitch? existing}) async {
+    final app = context.read<AppProvider>();
+    final number = TextEditingController(text: existing?.switchNumber);
+    final name = TextEditingController(text: existing?.name);
+    final location = TextEditingController(text: existing?.location);
+    final count = TextEditingController(text: existing?.portCount.toString() ?? '24');
+    String floor = existing?.floor ?? 'الأرضي';
+    String path = existing?.connectionType ?? 'internalServer';
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setState) => AlertDialog(
+      title: Text(existing == null ? 'إضافة سويتش' : 'تعديل السويتش'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: number, decoration: const InputDecoration(labelText: 'رقم السويتش *')),
+        TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم / موديل السويتش')),
+        TextField(controller: location, decoration: const InputDecoration(labelText: 'الموقع التفصيلي')),
+        TextField(controller: count, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'عدد المنافذ *')),
+        DropdownButtonFormField<String>(value: floor, decoration: const InputDecoration(labelText: 'الطابق'), items: const ['القبو','الأرضي','الأول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر'].map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(), onChanged:(v)=>setState(()=>floor=v ?? floor)),
+        DropdownButtonFormField<String>(value: path, decoration: const InputDecoration(labelText: 'مسار الشبكة'), items: const [DropdownMenuItem(value:'internalServer',child:Text('سيرفر داخلي')),DropdownMenuItem(value:'externalInternet',child:Text('إنترنت خارجي'))], onChanged:(v)=>setState(()=>path=v ?? path)),
+      ])),
+      actions: [TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')), FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))],
+    )));
+    if (ok != true) return;
+    final n = int.tryParse(count.text.trim());
+    if (number.text.trim().isEmpty || n == null || n < 1 || n > 96) { _message(context, 'أدخل رقم سويتش وعدداً صحيحاً للمنافذ بين 1 و96'); return; }
+    if (app.networkSwitches.any((s) => s.switchNumber.toLowerCase() == number.text.trim().toLowerCase() && s.id != existing?.id)) { _message(context, 'رقم السويتش مستخدم مسبقاً'); return; }
+    if (existing != null && (existing.ports.any((p) => (int.tryParse(p.portNumber) ?? 0) > n && ((p.pointNumber ?? '').isNotEmpty || (p.connectedDeviceId ?? '').isNotEmpty)) || app.devices.any((d) => d.switchId == existing.id && (int.tryParse(d.switchPortNumber ?? '') ?? 0) > n))) { _message(context, 'لا يمكن تقليل عدد المنافذ قبل نقل أو حذف التوصيلات الواقعة خارج النطاق'); return; }
+    final now = DateTime.now().toIso8601String();
+    final item = NetworkSwitch(id: existing?.id ?? DateTime.now().microsecondsSinceEpoch.toString(), switchNumber: number.text.trim(), name: name.text.trim(), floor: floor, location: location.text.trim(), portCount: n, connectionType: path, ports: existing?.ports ?? const [], notes: existing?.notes ?? '', createdAt: existing?.createdAt ?? now, updatedAt: now);
+    final result = await app.saveNetworkSwitch(item);
+    if (context.mounted) _message(context, result ?? 'تم حفظ السويتش');
   }
-}
 
-Widget _layer(String title, IconData icon, Color color, Widget child) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1E293B),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: color.withOpacity(0.35)),
-    ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(width: 8),
-        Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
-      ]),
-      const SizedBox(height: 12),
-      child,
-    ]),
-  );
-}
+  Future<void> _editPoint(BuildContext context, NetworkSwitch sw, String portNumber, NetworkSwitchPort? old) async {
+    final app = context.read<AppProvider>();
+    final point = TextEditingController(text: old?.pointNumber);
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text('بيانات منفذ $portNumber'),
+      content: TextField(controller: point, decoration: const InputDecoration(labelText: 'رقم النقطة الشبكية (اختياري)', hintText: 'يمكن تركه فارغاً وإضافته لاحقاً')),
+      actions: [TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))],
+    ));
+    if (ok != true) return;
+    final value = point.text.trim();
+    if (value.isNotEmpty && app.networkSwitches.any((item) => item.ports.any((p) => !(item.id == sw.id && p.portNumber == portNumber) && p.pointNumber?.trim().toLowerCase() == value.toLowerCase()))) { _message(context, 'رقم النقطة مرتبط مسبقاً بمنفذ آخر'); return; }
+    final ports = sw.ports.where((p) => p.portNumber != portNumber).toList()..add(NetworkSwitchPort(portNumber: portNumber, pointNumber: value.isEmpty ? null : value, connectedDeviceId: old?.connectedDeviceId, notes: old?.notes));
+    final updated = NetworkSwitch(id: sw.id, switchNumber: sw.switchNumber, name: sw.name, floor: sw.floor, location: sw.location, portCount: sw.portCount, connectionType: sw.connectionType, ports: ports, notes: sw.notes, createdAt: sw.createdAt, updatedAt: DateTime.now().toIso8601String());
+    final result = await app.saveNetworkSwitch(updated);
+    if (context.mounted) _message(context, result ?? (value.isEmpty ? 'تم إبقاء المنفذ دون رقم نقطة' : 'تم حفظ رقم النقطة ويمكن ربطه بالحاسب لاحقاً'));
+  }
 
-Widget _node(IconData icon, String label, Color color, {String? sub, bool large = false}) {
-  final size = large ? 56.0 : 44.0;
-  return Container(
-    width: large ? 100 : 88,
-    padding: const EdgeInsets.all(8),
-    child: Column(children: [
-      Container(
-        width: size, height: size,
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.5)),
-          boxShadow: [BoxShadow(color: color.withOpacity(0.2), blurRadius: 8)],
-        ),
-        child: Icon(icon, color: color, size: large ? 28 : 22),
-      ),
-      const SizedBox(height: 6),
-      Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
-      if (sub != null && sub.isNotEmpty)
-        Text(sub, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white38, fontSize: 9), maxLines: 2, overflow: TextOverflow.ellipsis),
-    ]),
-  );
-}
-
-Widget _arrow(String label) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: 40, height: 2, color: Colors.white24),
-      const Icon(Icons.arrow_downward_rounded, color: Colors.white38, size: 16),
-      const SizedBox(width: 6),
-      Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-      const SizedBox(width: 6),
-      const Icon(Icons.arrow_downward_rounded, color: Colors.white38, size: 16),
-      Container(width: 40, height: 2, color: Colors.white24),
-    ]),
-  );
-}
-
-Widget _dot(Color color, String label) {
-  return Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-      const SizedBox(width: 3),
-      Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9)),
-    ]),
-  );
+  void _message(BuildContext context, String value) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value))); }
 }

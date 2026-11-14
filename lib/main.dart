@@ -1,9 +1,7 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -14,27 +12,23 @@ import 'utils/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تحميل إعدادات الخلفية (Firebase / Supabase)
   final backend = BackendConfig();
   await backend.load();
 
-  // Firebase دائماً متاح كخيار افتراضي
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint('Firebase init: $e');
+  // فرض Supabase كخلفية افتراضية وتجاوز أي تفضيل قديم لـ Firebase
+  if (!backend.isSupabase) {
+    await backend.setBackend(BackendType.supabase);
   }
 
-  // تهيئة Supabase إن كان مفعّلاً ومضبوطاً
-  if (backend.isSupabase && backend.supabaseConfigured) {
-    try {
-      await SupabaseService.initialize();
-    } catch (e) {
-      debugPrint('Supabase init: $e');
-    }
+  try {
+    await SupabaseService.initialize();
+    debugPrint('Supabase initialized: ${backend.supabaseUrl}');
+  } catch (e, st) {
+    debugPrint('Supabase init failed: $e');
+    debugPrint('$st');
   }
+
+  // لا نهيئ Firebase هنا — يسبب FirebaseException على الويب بدون إعدادات حقيقية
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
@@ -78,7 +72,7 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
 
-    if (app.isLoading && app.currentUser == null) {
+    if (app.isLoading && !app.isLoggedIn) {
       return const Scaffold(
         body: Center(
           child: Column(

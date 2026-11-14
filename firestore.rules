@@ -1,0 +1,78 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email is string;
+    }
+
+    function settingsData() {
+      return get(/databases/$(database)/documents/system_settings/telecom).data;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/system_settings/telecom)
+        && (
+          ('currentAdminUid' in settingsData()
+            && settingsData().currentAdminUid == request.auth.uid)
+          ||
+          (!('currentAdminUid' in settingsData())
+            && settingsData().adminEmails is list
+            && settingsData().adminEmails.hasAny([request.auth.token.email]))
+        );
+    }
+
+    // The bootstrap document is created by the project owner.
+    // After bootstrap, only trusted Cloud Functions may change admin ownership.
+    match /system_settings/telecom {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /department_data/telecom/{collectionName}/{documentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /department_data/telecom/networkSwitches/{switchId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /pendingRequests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.targetCollection in [
+          'devices',
+          'custodyCards',
+          'movements',
+          'maintenanceTickets',
+          'phoneDirectory',
+          'telecomNetworks',
+          'networkSwitches'
+        ]
+        && request.resource.data.actionType is string
+        && request.resource.data.title is string
+        && request.resource.data.details is string
+        && request.resource.data.payload is map;
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.requesterUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Admin handover documents are accessed only through callable functions.
+    // Admin SDK bypasses these client security rules.
+    match /adminHandoverRequests/{requestId} {
+      allow read, write: if false;
+    }
+    match /adminHandoverAudit/{eventId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

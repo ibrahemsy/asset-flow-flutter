@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/supabase_secrets.dart';
 
 /// نوع الخلفية المستخدمة
 enum BackendType { firebase, supabase }
@@ -14,14 +15,14 @@ class BackendConfig {
   static const _keySupabaseAnon = 'supabase_anon_key';
   static const _keyAdminEmails = 'admin_emails';
 
-  BackendType type = BackendType.firebase;
-  String supabaseUrl = '';
-  String supabaseAnonKey = '';
+  /// الافتراضي: Supabase
+  BackendType type = BackendType.supabase;
+  String supabaseUrl = SupabaseSecrets.url;
+  String supabaseAnonKey = SupabaseSecrets.anonKey;
 
-  /// بريد مدير النظام (رئيس دائرة الاتصالات) — يمكن إضافة أكثر من بريد
+  /// بريد مدير النظام (رئيس دائرة الاتصالات)
   List<String> adminEmails = [
-    'ferasnatof@gmail.com',
-    'gfa437926@gmail.com',
+    'baselformobile@gmail.com',
   ];
 
   bool get isSupabase => type == BackendType.supabase;
@@ -32,9 +33,15 @@ class BackendConfig {
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final t = prefs.getString(_keyBackend);
-    type = t == 'supabase' ? BackendType.supabase : BackendType.firebase;
-    supabaseUrl = prefs.getString(_keySupabaseUrl) ?? '';
-    supabaseAnonKey = prefs.getString(_keySupabaseAnon) ?? '';
+    // إن لم يختر المستخدم سابقاً → Supabase
+    if (t == 'firebase') {
+      type = BackendType.firebase;
+    } else {
+      type = BackendType.supabase;
+    }
+    supabaseUrl = prefs.getString(_keySupabaseUrl) ?? SupabaseSecrets.url;
+    supabaseAnonKey =
+        prefs.getString(_keySupabaseAnon) ?? SupabaseSecrets.anonKey;
     final admins = prefs.getStringList(_keyAdminEmails);
     if (admins != null && admins.isNotEmpty) {
       adminEmails = admins;
@@ -68,14 +75,17 @@ class BackendConfig {
 
   Future<void> addAdminEmail(String email) async {
     final e = email.trim().toLowerCase();
-    if (e.isEmpty || adminEmails.map((x) => x.toLowerCase()).contains(e)) return;
+    if (e.isEmpty || adminEmails.map((x) => x.toLowerCase()).contains(e)) {
+      return;
+    }
     adminEmails = [...adminEmails, e];
     await save();
   }
 
   Future<void> removeAdminEmail(String email) async {
-    adminEmails =
-        adminEmails.where((x) => x.toLowerCase() != email.toLowerCase()).toList();
+    adminEmails = adminEmails
+        .where((x) => x.toLowerCase() != email.toLowerCase())
+        .toList();
     await save();
   }
 

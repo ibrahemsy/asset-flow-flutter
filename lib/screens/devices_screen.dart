@@ -197,6 +197,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
                 if (d.ram != null) _DetailRow('الرام', d.ram!),
                 if (d.storage != null) _DetailRow('التخزين', d.storage!),
                 if (d.ipAddress != null) _DetailRow('IP', d.ipAddress!),
+                if (d.networkConnection != null && d.networkConnection!.isNotEmpty) _DetailRow('مسار الشبكة', d.networkConnection == 'internalServer' ? 'سيرفر داخلي' : d.networkConnection == 'externalInternet' ? 'إنترنت خارجي' : 'غير متصل'),
+                if (d.switchNumber != null && d.switchNumber!.isNotEmpty) _DetailRow('رقم السويتش', d.switchNumber!),
+                if (d.switchFloor != null && d.switchFloor!.isNotEmpty) _DetailRow('طابق السويتش', d.switchFloor!),
+                if (d.switchPortNumber != null && d.switchPortNumber!.isNotEmpty) _DetailRow('منفذ السويتش', d.switchPortNumber!),
                 if (d.notes != null && d.notes!.isNotEmpty) _DetailRow('ملاحظات', d.notes!),
                 const SizedBox(height: 20),
                 Row(
@@ -264,6 +268,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final locationCtrl = TextEditingController(text: existing?.location);
     final supplierCtrl = TextEditingController(text: existing?.supplier);
     final notesCtrl = TextEditingController(text: existing?.notes);
+    final switchNumberCtrl = TextEditingController(text: existing?.switchNumber);
+    final switchPortCtrl = TextEditingController(text: existing?.switchPortNumber);
+    String networkConnection = existing?.networkConnection ?? '';
+    String switchFloor = existing?.switchFloor ?? 'الأرضي';
+    String? selectedSwitchId = existing?.switchId;
     DeviceCategory category = existing?.category ?? DeviceCategory.desktop;
     DeviceCondition condition = existing?.condition ?? DeviceCondition.good;
     DeviceStatus status = existing?.status ?? DeviceStatus.inWarehouse;
@@ -324,6 +333,42 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   TextField(controller: assetCtrl, decoration: const InputDecoration(labelText: 'رقم الأصل / العهدة')),
                   const SizedBox(height: 10),
                   TextField(controller: locationCtrl, decoration: const InputDecoration(labelText: 'الموقع')),
+                  if (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const Text('بيانات اتصال الشبكة', style: TextStyle(fontWeight: FontWeight.bold)),
+                    DropdownButtonFormField<String>(
+                      value: networkConnection.isEmpty ? null : networkConnection,
+                      decoration: const InputDecoration(labelText: 'يتصل الحاسب بـ'),
+                      items: const [
+                        DropdownMenuItem(value: 'internalServer', child: Text('سيرفر داخلي')),
+                        DropdownMenuItem(value: 'externalInternet', child: Text('إنترنت خارجي')),
+                        DropdownMenuItem(value: 'none', child: Text('غير متصل بالشبكة')),
+                      ],
+                      onChanged: (v) => setModalState(() => networkConnection = v ?? ''),
+                    ),
+                    if (networkConnection == 'internalServer' || networkConnection == 'externalInternet') ...[
+                      DropdownButtonFormField<String>(
+                        value: selectedSwitchId,
+                        decoration: const InputDecoration(labelText: 'السويتش المسجل (اختياري للربط لاحقاً)'),
+                        items: app.networkSwitches.map((sw) => DropdownMenuItem(value: sw.id, child: Text('السويتش ${sw.switchNumber} - ${sw.floor} (${sw.portCount} منفذ)'))).toList(),
+                        onChanged: (v) => setModalState(() {
+                          selectedSwitchId = v;
+                          final selected = app.networkSwitches.where((sw) => sw.id == v).firstOrNull;
+                          if (selected != null) { switchNumberCtrl.text = selected.switchNumber; switchFloor = selected.floor; }
+                        }),
+                      ),
+                      if (app.networkSwitches.isEmpty) const Text('لا يوجد سجل سويتشات بعد. يمكنك تسجيل الجهاز أولاً وربطه لاحقاً.', style: TextStyle(fontSize: 11, color: Colors.orange)),
+                      TextField(controller: switchNumberCtrl, decoration: const InputDecoration(labelText: 'رقم السويتش (للتوثيق المؤقت عند عدم الربط)')),
+                      DropdownButtonFormField<String>(
+                        value: switchFloor,
+                        decoration: const InputDecoration(labelText: 'طابق السويتش'),
+                        items: const ['القبو', 'الأرضي', 'الأول', 'الثاني', 'الثالث', 'الرابع', 'الخامس', 'السادس', 'السابع', 'الثامن', 'التاسع', 'العاشر'].map((floor) => DropdownMenuItem(value: floor, child: Text(floor))).toList(),
+                        onChanged: (v) => setModalState(() => switchFloor = v ?? 'الأرضي'),
+                      ),
+                      TextField(controller: switchPortCtrl, decoration: const InputDecoration(labelText: 'رقم منفذ السويتش')),
+                    ],
+                  ],
                   const SizedBox(height: 10),
                   TextField(controller: supplierCtrl, decoration: const InputDecoration(labelText: 'المورد')),
                   const SizedBox(height: 10),
@@ -355,6 +400,23 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         );
                         return;
                       }
+                      if (selectedSwitchId != null) {
+                        final selectedSwitch = app.networkSwitches.where((sw) => sw.id == selectedSwitchId).firstOrNull;
+                        final port = int.tryParse(switchPortCtrl.text.trim());
+                        if (selectedSwitch == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('السويتش المحدد غير موجود')));
+                          return;
+                        }
+                        if (port == null || port < 1 || port > selectedSwitch.portCount) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('أدخل رقم منفذ بين 1 و${selectedSwitch.portCount}')));
+                          return;
+                        }
+                        final occupied = app.devices.any((item) => item.id != existing?.id && item.switchId == selectedSwitchId && item.switchPortNumber == port.toString());
+                        if (occupied) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('هذا المنفذ مرتبط بحاسب آخر على السويتش نفسه')));
+                          return;
+                        }
+                      }
                       final now = DateTime.now().toIso8601String();
                       final device = Device(
                         id: existing?.id ?? const Uuid().v4(),
@@ -370,6 +432,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         condition: condition,
                         status: status,
                         location: locationCtrl.text.trim(),
+                        networkConnection: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? networkConnection : existing?.networkConnection,
+                        switchNumber: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchNumberCtrl.text.trim() : existing?.switchNumber,
+                        switchId: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? selectedSwitchId : existing?.switchId,
+                        switchFloor: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchFloor : existing?.switchFloor,
+                        switchPortNumber: (category == DeviceCategory.desktop || category == DeviceCategory.laptop) ? switchPortCtrl.text.trim() : existing?.switchPortNumber,
                         notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
                         attachments: existing?.attachments ?? [],
                         createdAt: existing?.createdAt ?? now,
