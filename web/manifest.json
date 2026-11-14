@@ -1,0 +1,10 @@
+{
+  "name": "نظام إدارة الأصول والعهدة",
+  "short_name": "Asset Flow",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e40af",
+  "description": "نظام إدارة الأصول والعهدة - دائرة الاتصالات",
+  "orientation": "any"
+}
