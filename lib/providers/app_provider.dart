@@ -35,6 +35,7 @@ class AppProvider extends ChangeNotifier {
 
   StreamSubscription<AuthState>? _authSubscription;
   bool get isLoggedIn => currentUser != null;
+  String get currentUserName => currentUser?.userMetadata?['display_name'] as String? ?? currentUser?.email?.split('@').first ?? '';
   bool get isHeadOfDept => _isAdmin;
   bool get isSystemAdmin => _isAdmin;
   bool get isSupabaseBackend => true;
