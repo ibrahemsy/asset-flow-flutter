@@ -119,8 +119,54 @@ jobs:
           fi
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "platforms;android-36" </dev/null
 
+      - name: Configure iOS deployment target for mobile_scanner
+        if: matrix.platform == 'apple'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          podfile = Path("ios/Podfile")
+          content = podfile.read_text()
+          if re.search(r"^platform :ios,", content, re.MULTILINE):
+              content = re.sub(r"^platform :ios,.*$", "platform :ios, '15.5'", content, flags=re.MULTILINE)
+          else:
+              content = "platform :ios, '15.5'\\n" + content
+          podfile.write_text(content)
+
+          project = Path("ios/Runner.xcodeproj/project.pbxproj")
+          if project.exists():
+              project.write_text(project.read_text().replace(
+                  "IPHONEOS_DEPLOYMENT_TARGET = 13.0;",
+                  "IPHONEOS_DEPLOYMENT_TARGET = 15.5;"
+              ))
+          PY
+
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Align file_picker Android plugin compile SDK
+        if: matrix.platform == 'android'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          cache = Path.home() / ".pub-cache" / "hosted" / "pub.dev"
+          candidates = list(cache.glob("file_picker-*/android/build.gradle"))
+          if not candidates:
+              raise SystemExit("file_picker Android Gradle file was not found")
+          for path in candidates:
+              content = path.read_text()
+              updated = content.replace("compileSdkVersion 34", "compileSdkVersion 36")
+              updated = updated.replace("compileSdk = 34", "compileSdk = 36")
+              if updated != content:
+                  path.write_text(updated)
+                  print(f"Updated plugin compile SDK: {path}")
+              else:
+                  print(f"No legacy compile SDK declaration found in {path}")
+          PY
 
       - name: Build Web
         if: matrix.platform == 'web'
@@ -132,6 +178,8 @@ jobs:
 
       - name: Build Windows desktop
         if: matrix.platform == 'windows'
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: flutter build windows --release
 
       - name: Build Linux desktop
