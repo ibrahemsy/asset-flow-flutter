@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
-import 'backend_config.dart';
 
 /// خدمة Supabase — نفس منطق Firebase (جداول + اعتماد من مدير النظام)
 class SupabaseService {
