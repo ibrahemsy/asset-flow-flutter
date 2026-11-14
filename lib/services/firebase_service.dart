@@ -12,7 +12,13 @@ class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
+
+  // Client ID للويب فقط (علني). لا تضع client_secret في التطبيق.
+  static const String webClientId =
+      '164329186660-k43p205m3hnb66h900a63vf6jclpuqcb.apps.googleusercontent.com';
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: webClientId,
     scopes: [
       'email',
       'https://www.googleapis.com/auth/spreadsheets',
