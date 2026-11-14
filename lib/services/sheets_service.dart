@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/models.dart';
-import 'firebase_service.dart';
 
 class SheetsExportResult {
   final String spreadsheetId;
@@ -15,7 +14,6 @@ class SheetsService {
   factory SheetsService() => _instance;
   SheetsService._internal();
 
-  final FirebaseService _firebase = FirebaseService();
 
   /// تصدير الأجهزة وبطاقات العهدة إلى Google Sheets جديد
   Future<SheetsExportResult> exportInventoryToGoogleSheets({
@@ -23,13 +21,8 @@ class SheetsService {
     required List<Device> devices,
     required List<CustodyCard> custodyCards,
   }) async {
-    final token = await _firebase.getGoogleAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception(
-        'يرجى تسجيل الدخول بحساب Google أولاً لمنح الإذن بربط جداول Google Sheets.\n'
-        'تأكد من الموافقة على صلاحية spreadsheets عند تسجيل الدخول.',
-      );
-    }
+    throw UnsupportedError('تصدير Google Sheets غير متاح بعد إزالة Firebase. يلزم إعداد Google OAuth مستقل عبر Google Cloud.');
+    const token = '';
 
     // 1. إنشاء جدول جديد
     final createResponse = await http.post(
@@ -174,10 +167,8 @@ class SheetsService {
     required List<Movement> movements,
     required List<MaintenanceTicket> tickets,
   }) async {
-    final token = await _firebase.getGoogleAccessToken();
-    if (token == null || token.isEmpty) {
-      throw Exception('يرجى تسجيل الدخول بحساب Google مع صلاحية Sheets');
-    }
+    throw UnsupportedError('تصدير Google Sheets غير متاح بعد إزالة Firebase. يلزم إعداد Google OAuth مستقل عبر Google Cloud.');
+    const token = '';
 
     final createResponse = await http.post(
       Uri.parse('https://sheets.googleapis.com/v4/spreadsheets'),
