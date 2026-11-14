@@ -86,13 +86,46 @@ class SupabaseService {
     return {...row, ...decoded, 'id': row['id']};
   }
 
-  Map<String, dynamic> _encodeOperationalPayload(Map<String, dynamic> payload) {
+  Map<String, dynamic> _encodeOperationalPayload(
+    Map<String, dynamic> payload, {
+    required String table,
+  }) {
     final values = Map<String, dynamic>.from(payload);
     final id = values.remove('id');
     if (id == null || id.toString().isEmpty) {
       throw ArgumentError('يجب تحديد معرّف السجل قبل الحفظ');
     }
-    return {'id': id, 'data': values};
+    dynamic pick(String camel, [String? alternate]) =>
+        values[camel] ?? (alternate == null ? null : values[alternate]);
+    final row = <String, dynamic>{'id': id, 'data': values};
+    final columns = <String, List<String>>{
+      'devices': ['name','category','manufacturer','model','serial_number','barcode','asset_number','condition','status','location','assigned_employee','notes'],
+      'custody_cards': ['card_number','employee_name','national_id','job_title','department','division','office_or_center','creation_date','items','status','notes'],
+      'movements': ['reference_number','type','device_id','device_name','serial_number','from_entity','to_entity','executor_name','date','reason','notes'],
+      'maintenance_tickets': ['ticket_number','device_name','serial_number','fault_description','station_or_dept','report_date','priority','assigned_tech','actions_taken','spare_parts_used','status'],
+      'phone_directory': ['phone_number','employee_name','department','office_location','pbx_port_number','point_number','status','notes'],
+      'telecom_networks': ['name','type','ip_range','gateway','bandwidth','frequency','location','status','notes'],
+    };
+    const aliases = <String, String>{
+      'serial_number':'serialNumber', 'asset_number':'assetNumber',
+      'assigned_employee':'assignedEmployee', 'card_number':'cardNumber',
+      'employee_name':'employeeName', 'national_id':'nationalId',
+      'job_title':'jobTitle', 'office_or_center':'workCenter',
+      'creation_date':'creationDate', 'reference_number':'referenceNumber',
+      'device_id':'deviceId', 'device_name':'deviceName',
+      'from_entity':'fromEntity', 'to_entity':'toEntity',
+      'executor_name':'executorName', 'ticket_number':'ticketNumber',
+      'fault_description':'faultDescription', 'station_or_dept':'stationOrDept',
+      'report_date':'reportDate', 'assigned_tech':'assignedTech',
+      'actions_taken':'actionsTaken', 'spare_parts_used':'sparePartsUsed',
+      'phone_number':'phoneNumber', 'office_location':'officeLocation',
+      'pbx_port_number':'pbxPortNumber', 'point_number':'pointNumber',
+    };
+    for (final column in columns[table] ?? const <String>[]) {
+      final value = pick(aliases[column] ?? column);
+      if (value != null) row[column] = value;
+    }
+    return row;
   }
 
   Future<void> _logAudit({
@@ -130,7 +163,7 @@ class SupabaseService {
       if (actionType.startsWith('delete') && id != null) {
         await _client.from(table).delete().eq('id', id);
       } else {
-        await _client.from(table).upsert(_encodeOperationalPayload(payload));
+        await _client.from(table).upsert(_encodeOperationalPayload(payload, table: table));
       }
       await _logAudit(
         action: title,
@@ -342,7 +375,7 @@ class SupabaseService {
     if (req.actionType.startsWith('delete') && id != null) {
       await _client.from(table).delete().eq('id', id);
     } else {
-      await _client.from(table).upsert(_encodeOperationalPayload(req.payload));
+      await _client.from(table).upsert(_encodeOperationalPayload(req.payload, table: table));
     }
     await _client.from('pending_requests').update({
       'status': 'approved',
