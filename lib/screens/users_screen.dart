@@ -74,18 +74,12 @@ class _UsersScreenState extends State<UsersScreen> {
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 children: const [
                   Text(
-                    'أنشئ الجداول التالية في SQL Editor:\n\n'
-                    '• devices\n'
-                    '• custody_cards\n'
-                    '• movements\n'
-                    '• maintenance_tickets\n'
-                    '• phone_directory\n'
-                    '• telecom_networks\n'
-                    '• audit_logs\n'
-                    '• pending_requests\n\n'
-                    'كل جدول يحتاج عمود id (text PK) وباقي الحقول حسب النماذج.\n'
-                    'فعّل Row Level Security حسب الحاجة.\n'
-                    'مدير النظام يعتمد الطلبات من جدول pending_requests.',
+                    'الجداول التشغيلية موجودة في مشروع Supabase المرتبط، '
+                    'وتُطبق عليها سياسات Row Level Security.\\n\\n'
+                    'الجداول الأساسية: devices, custody_cards, movements, '
+                    'maintenance_tickets, phone_directory, telecom_networks, '
+                    'audit_logs, pending_requests.\\n\\n'
+                    'لا تُنشئ نسخاً مكررة من هذه الجداول يدوياً.',
                     style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                 ],
