@@ -80,12 +80,11 @@ class SupabaseService {
 
   Map<String, dynamic> _decodeOperationalRow(dynamic value) {
     final row = Map<String, dynamic>.from(value as Map);
-    final data = row['data'];
-    return {
-      if (data is Map) ...Map<String, dynamic>.from(data),
-      ...row..remove('data'),
-      'id': row['id'],
-    };
+    final data = row.remove('data');
+    final decoded = data is Map
+        ? Map<String, dynamic>.from(data)
+        : <String, dynamic>{};
+    return {...row, ...decoded, 'id': row['id']};
   }
 
   Map<String, dynamic> _encodeOperationalPayload(Map<String, dynamic> payload) {
