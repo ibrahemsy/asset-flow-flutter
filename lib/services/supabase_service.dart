@@ -110,7 +110,7 @@ class SupabaseService {
       'serial_number':'serialNumber', 'asset_number':'assetNumber',
       'assigned_employee':'assignedEmployee', 'card_number':'cardNumber',
       'employee_name':'employeeName', 'national_id':'nationalId',
-      'job_title':'jobTitle', 'office_or_center':'workCenter',
+      'job_title':'jobTitle', 'office_or_center':'officeOrCenter',
       'creation_date':'creationDate', 'reference_number':'referenceNumber',
       'device_id':'deviceId', 'device_name':'deviceName',
       'from_entity':'fromEntity', 'to_entity':'toEntity',
@@ -118,7 +118,7 @@ class SupabaseService {
       'fault_description':'faultDescription', 'station_or_dept':'stationOrDept',
       'report_date':'reportDate', 'assigned_tech':'assignedTech',
       'actions_taken':'actionsTaken', 'spare_parts_used':'sparePartsUsed',
-      'phone_number':'phoneNumber', 'office_location':'officeLocation',
+      'phone_number':'phoneNumber', 'office_location':'officeLocation', 'ip_range':'ipRange',
       'pbx_port_number':'pbxPortNumber', 'point_number':'pointNumber',
     };
     for (final column in columns[table] ?? const <String>[]) {
