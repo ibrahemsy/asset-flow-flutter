@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'services/backend_config.dart';
 import 'services/supabase_service.dart';
 import 'utils/app_theme.dart';
 
