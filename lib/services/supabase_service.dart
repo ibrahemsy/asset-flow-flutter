@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 
-/// خدمة Supabase — نفس منطق Firebase (جداول + اعتماد من مدير النظام)
+/// خدمة Supabase للمصادقة والبيانات وطلبات الاعتماد.
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
   factory SupabaseService() => _instance;
