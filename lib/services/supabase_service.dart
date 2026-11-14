@@ -29,7 +29,7 @@ class SupabaseService {
       'SUPABASE_ANON_KEY',
       defaultValue: 'sb_publishable_NReQPyV3Xd1RoR_RWfqVRg_opiQkOOA',
     );
-    await Supabase.initialize(url: url, anonKey: publishableKey);
+    await Supabase.initialize(url: url, publishableKey: publishableKey);
   }
 
   // -------------------- Auth --------------------
