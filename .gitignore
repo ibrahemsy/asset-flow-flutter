@@ -17,8 +17,6 @@ doc/api/
 *.iws
 
 # Platform secrets (ضع ملفاتك محلياً بعد clone)
-**/google-services.json
-**/GoogleService-Info.plist
 
 # Env / keys
 .env
