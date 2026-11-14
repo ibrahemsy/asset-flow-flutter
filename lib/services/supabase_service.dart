@@ -78,6 +78,25 @@ class SupabaseService {
 
   // -------------------- Helpers --------------------
 
+  Map<String, dynamic> _decodeOperationalRow(dynamic value) {
+    final row = Map<String, dynamic>.from(value as Map);
+    final data = row['data'];
+    return {
+      if (data is Map) ...Map<String, dynamic>.from(data),
+      ...row..remove('data'),
+      'id': row['id'],
+    };
+  }
+
+  Map<String, dynamic> _encodeOperationalPayload(Map<String, dynamic> payload) {
+    final values = Map<String, dynamic>.from(payload);
+    final id = values.remove('id');
+    if (id == null || id.toString().isEmpty) {
+      throw ArgumentError('يجب تحديد معرّف السجل قبل الحفظ');
+    }
+    return {'id': id, 'data': values};
+  }
+
   Future<void> _logAudit({
     required String action,
     required String entity,
@@ -113,7 +132,7 @@ class SupabaseService {
       if (actionType.startsWith('delete') && id != null) {
         await _client.from(table).delete().eq('id', id);
       } else {
-        await _client.from(table).upsert(payload);
+        await _client.from(table).upsert(_encodeOperationalPayload(payload));
       }
       await _logAudit(
         action: title,
@@ -145,28 +164,28 @@ class SupabaseService {
   Future<List<Device>> fetchDevices() async {
     final rows = await _client.from('devices').select();
     return (rows as List)
-        .map((r) => Device.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+        .map((r) => Device.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
   Future<List<CustodyCard>> fetchCustodyCards() async {
     final rows = await _client.from('custody_cards').select();
     return (rows as List)
-        .map((r) => CustodyCard.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+        .map((r) => CustodyCard.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
   Future<List<Movement>> fetchMovements() async {
     final rows = await _client.from('movements').select();
     return (rows as List)
-        .map((r) => Movement.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+        .map((r) => Movement.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
   Future<List<MaintenanceTicket>> fetchTickets() async {
     final rows = await _client.from('maintenance_tickets').select();
     return (rows as List)
-        .map((r) => MaintenanceTicket.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+        .map((r) => MaintenanceTicket.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
@@ -187,7 +206,7 @@ class SupabaseService {
     final rows = await _client.from('phone_directory').select();
     return (rows as List)
         .map((r) =>
-            PhoneDirectoryEntry.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+            PhoneDirectoryEntry.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
@@ -195,7 +214,7 @@ class SupabaseService {
     final rows = await _client.from('telecom_networks').select();
     return (rows as List)
         .map((r) =>
-            TelecomNetworkInfo.fromMap(Map<String, dynamic>.from(r), r['id'] as String))
+            TelecomNetworkInfo.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
 
@@ -325,7 +344,7 @@ class SupabaseService {
     if (req.actionType.startsWith('delete') && id != null) {
       await _client.from(table).delete().eq('id', id);
     } else {
-      await _client.from(table).upsert(req.payload);
+      await _client.from(table).upsert(_encodeOperationalPayload(req.payload));
     }
     await _client.from('pending_requests').update({
       'status': 'approved',
