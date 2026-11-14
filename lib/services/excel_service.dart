@@ -555,7 +555,7 @@ class ExcelService {
         return ImportResult(success: false, message: 'الملف فارغ أو غير صالح', items: []);
       }
       final sheet = excel.tables.values.first;
-      if (sheet == null || sheet.maxRows < 2) {
+      if (sheet.maxRows < 2) {
         return ImportResult(success: false, message: 'لا توجد بيانات', items: []);
       }
 
@@ -635,7 +635,7 @@ class ExcelService {
   String _cellStr(Data? cell) {
     if (cell == null || cell.value == null) return '';
     final v = cell.value;
-    if (v is TextCellValue) return v.value.toPlainText();
+    if (v is TextCellValue) return v.value.text ?? '';
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     if (v is DateCellValue) {
