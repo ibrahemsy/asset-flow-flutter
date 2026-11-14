@@ -323,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 22,
                   backgroundColor: Colors.white.withOpacity(0.2),
                   child: Text(
-                    (app.currentUserName ?? '?')[0],
+                    (app.currentUserName.isNotEmpty ? app.currentUserName[0] : '?'),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ),
@@ -333,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        app.currentUserName ?? '',
+                        app.currentUserName,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),
