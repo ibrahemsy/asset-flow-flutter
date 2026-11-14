@@ -19,8 +19,8 @@ No initial administrator was assigned by this migration. The Auth users already 
 
 Do not place SQL service credentials or a Supabase service-role key in the Flutter app. Initial role provisioning must be performed through a trusted administrative path (for example, SQL Editor by the project owner or a protected server-side function).
 
-## Client integration still required
+## Client integration status
 
-The current Flutter service still serializes models as if each table had every camelCase model field as a top-level SQL column. The migration's `data` JSONB columns are the compatibility target, but `SupabaseService` must be updated to read/write `data` and map selected searchable fields to snake_case columns before this application can use the new schema.
+The active Flutter provider now uses Supabase Auth and the Supabase data service. Operational records are serialized into each table's `data` JSONB column, with the currently supported searchable fields also written to their normalized snake_case columns.
 
-This migration does not make the Flutter application Supabase-only by itself. Firebase references and provider wiring remain to be removed in a subsequent code migration.
+The integration remains subject to successful Flutter analysis/tests/builds and live Auth/RLS/CRUD verification. Realtime subscriptions are not yet implemented. Google Sheets export is disabled pending a separate Google OAuth setup. The app does not provision an administrator automatically; an owner must explicitly assign a verified Auth UID in `private.admin_assignments`.
