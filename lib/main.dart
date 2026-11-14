@@ -1,9 +1,7 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
@@ -17,32 +15,20 @@ void main() async {
   final backend = BackendConfig();
   await backend.load();
 
-  // تهيئة Supabase عند اختياره (الافتراضي)
-  if (backend.isSupabase) {
-    try {
-      if (!backend.supabaseConfigured) {
-        await backend.setSupabaseCredentials(
-          url: backend.supabaseUrl,
-          anonKey: backend.supabaseAnonKey,
-        );
-      }
-      await SupabaseService.initialize();
-      debugPrint('Supabase initialized');
-    } catch (e) {
-      debugPrint('Supabase init: $e');
-    }
+  // فرض Supabase كخلفية افتراضية وتجاوز أي تفضيل قديم لـ Firebase
+  if (!backend.isSupabase) {
+    await backend.setBackend(BackendType.supabase);
   }
 
-  // Firebase اختياري إن بقي مفعّلاً
-  if (backend.isFirebase) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    } catch (e) {
-      debugPrint('Firebase init: $e');
-    }
+  try {
+    await SupabaseService.initialize();
+    debugPrint('Supabase initialized: ${backend.supabaseUrl}');
+  } catch (e, st) {
+    debugPrint('Supabase init failed: $e');
+    debugPrint('$st');
   }
+
+  // لا نهيئ Firebase هنا — يسبب FirebaseException على الويب بدون إعدادات حقيقية
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

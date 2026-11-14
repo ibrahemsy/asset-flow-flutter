@@ -1,21 +1,18 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/backend_config.dart';
-import '../services/firebase_service.dart';
 import '../services/supabase_service.dart';
 import '../services/catalog_service.dart';
 import '../services/excel_service.dart';
 import '../services/sheets_service.dart';
 
+/// مزوّد الحالة — مسار Supabase فقط (بدون تهيئة Firebase على الويب)
 class AppProvider extends ChangeNotifier {
-  final FirebaseService _firebase = FirebaseService();
   final SupabaseService _supabase = SupabaseService();
   final BackendConfig _backend = BackendConfig();
   final CatalogService catalog = CatalogService();
 
-  User? currentUser;
   String? supabaseEmail;
   String? supabaseUid;
   String? supabaseName;
@@ -53,18 +50,16 @@ class AppProvider extends ChangeNotifier {
 
   final List<StreamSubscription> _subs = [];
 
-  bool get isLoggedIn => _backend.isSupabase
-      ? (supabaseEmail != null && supabaseEmail!.isNotEmpty)
-      : currentUser != null;
+  bool get isLoggedIn =>
+      supabaseEmail != null && supabaseEmail!.isNotEmpty;
 
-  String? get activeEmail =>
-      _backend.isSupabase ? supabaseEmail : currentUser?.email;
+  String? get activeEmail => supabaseEmail;
 
   bool get isHeadOfDept => _backend.isSystemAdmin(activeEmail);
 
   bool get isSystemAdmin => isHeadOfDept;
 
-  BackendType get backendType => _backend.type;
+  BackendType get backendType => BackendType.supabase;
 
   AppProvider() {
     _init();
@@ -73,8 +68,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> _init() async {
     await catalog.load();
     await _backend.load();
+    if (!_backend.isSupabase) {
+      await _backend.setBackend(BackendType.supabase);
+    }
 
-    if (_backend.isSupabase) {
+    try {
       final u = _supabase.currentUser;
       if (u != null) {
         supabaseEmail = u.email;
@@ -85,6 +83,7 @@ class AppProvider extends ChangeNotifier {
         isLoading = false;
         notifyListeners();
       }
+
       _subs.add(_supabase.authStateChanges.listen((state) async {
         final user = state.session?.user;
         if (user != null) {
@@ -101,17 +100,11 @@ class AppProvider extends ChangeNotifier {
           notifyListeners();
         }
       }));
-    } else {
-      _subs.add(_firebase.authStateChanges.listen((user) async {
-        currentUser = user;
-        if (user != null) {
-          await _loadFirebaseData();
-        } else {
-          _clearData();
-          isLoading = false;
-          notifyListeners();
-        }
-      }));
+    } catch (e, st) {
+      debugPrint('AppProvider init: $e');
+      debugPrint('$st');
+      isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -142,70 +135,6 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadFirebaseData() async {
-    isLoading = true;
-    notifyListeners();
-
-    try {
-      final settings = await _firebase.getSystemSettings();
-      headEmail = settings.headEmail;
-      departmentName = settings.departmentName;
-
-      currentRole =
-          isHeadOfDept ? UserRoleType.director : UserRoleType.technician;
-
-      for (final s in _subs.skip(1)) {
-        s.cancel();
-      }
-      if (_subs.length > 1) {
-        _subs.removeRange(1, _subs.length);
-      }
-
-      _subs.add(_firebase.devicesStream().listen((list) {
-        devices = list;
-        catalog.syncFromDevices(list);
-        notifyListeners();
-      }));
-      _subs.add(_firebase.custodyCardsStream().listen((list) {
-        custodyCards = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.movementsStream().listen((list) {
-        movements = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.ticketsStream().listen((list) {
-        tickets = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.auditLogsStream().listen((list) {
-        auditLogs = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.phoneDirectoryStream().listen((list) {
-        phoneDirectory = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.networkSwitchesStream().listen((list) {
-        networkSwitches = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.telecomNetworksStream().listen((list) {
-        telecomNetworks = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.pendingRequestsStream().listen((list) {
-        pendingRequests = list;
-        notifyListeners();
-      }));
-    } catch (e) {
-      debugPrint('Load error: $e');
-    } finally {
-      isLoading = false;
-      notifyListeners();
-    }
-  }
-
   void _clearData() {
     currentRole = UserRoleType.technician;
     devices = [];
@@ -228,11 +157,7 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.signInWithGoogle();
-      } else {
-        await _firebase.signInWithGoogle();
-      }
+      await _supabase.signInWithGoogle();
     } finally {
       isSyncing = false;
       notifyListeners();
@@ -262,13 +187,13 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      final res =
-          await _supabase.signUp(email, password, name: name);
+      final res = await _supabase.signUp(email, password, name: name);
       final u = res.user;
       if (u != null) {
         supabaseEmail = u.email;
         supabaseUid = u.id;
-        supabaseName = name?.isNotEmpty == true ? name : _supabase.userName;
+        supabaseName =
+            name != null && name.isNotEmpty ? name : _supabase.userName;
         await _loadSupabaseData();
       }
     } finally {
@@ -278,36 +203,17 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    if (_backend.isSupabase) {
-      await _supabase.signOut();
-      supabaseEmail = null;
-      supabaseUid = null;
-      supabaseName = null;
-      _clearData();
-      notifyListeners();
-    } else {
-      await _firebase.signOut();
-    }
+    await _supabase.signOut();
+    supabaseEmail = null;
+    supabaseUid = null;
+    supabaseName = null;
+    _clearData();
+    notifyListeners();
   }
 
   Future<String?> saveNetworkSwitch(NetworkSwitch networkSwitch) async {
     if (!isLoggedIn) return 'يجب تسجيل الدخول';
-    if (_backend.isSupabase) {
-      return 'حفظ السويتش عبر Supabase قيد التوسيع — استخدم الأجهزة/العهدة حالياً';
-    }
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.saveNetworkSwitch(
-          networkSwitch, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب السويتش لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    return 'حفظ السويتش عبر Supabase قيد التوسيع — استخدم الأجهزة/العهدة حالياً';
   }
 
   Future<String?> saveDevice(Device device) async {
@@ -315,15 +221,10 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.saveDevice(device);
-        await catalog.learnFromDevice(device);
-        await _loadSupabaseData();
-        return isHeadOfDept ? null : 'تم إرسال الطلب للاعتماد';
-      }
-      await _firebase.saveDevice(device, currentUser!, isHeadOfDept);
+      await _supabase.saveDevice(device);
       await catalog.learnFromDevice(device);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _loadSupabaseData();
+      return isHeadOfDept ? null : 'تم إرسال الطلب للاعتماد';
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -338,14 +239,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.deleteDevice(id, dev?.name ?? id);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.deleteDevice(
-          id, dev?.name ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
+      await _supabase.deleteDevice(id, dev?.name ?? id);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -359,13 +255,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.saveCustodyCard(card);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.saveCustodyCard(card, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _supabase.saveCustodyCard(card);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -380,14 +272,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.deleteCustodyCard(id, card?.cardNumber ?? id);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.deleteCustodyCard(
-          id, card?.cardNumber ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
+      await _supabase.deleteCustodyCard(id, card?.cardNumber ?? id);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -401,13 +288,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.saveMovement(movement);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.saveMovement(movement, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _supabase.saveMovement(movement);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -421,13 +304,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.saveTicket(ticket);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.saveTicket(ticket, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _supabase.saveTicket(ticket);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -442,14 +321,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.deleteTicket(id, t?.ticketNumber ?? id);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.deleteTicket(
-          id, t?.ticketNumber ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
+      await _supabase.deleteTicket(id, t?.ticketNumber ?? id);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -463,13 +337,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.savePhone(entry);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.savePhoneEntry(entry, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _supabase.savePhone(entry);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -484,14 +354,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.deletePhone(id, e?.employeeName ?? id);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.deletePhoneEntry(
-          id, e?.employeeName ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
+      await _supabase.deletePhone(id, e?.employeeName ?? id);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -505,13 +370,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.saveNetwork(network);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.saveTelecomNetwork(network, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await _supabase.saveNetwork(network);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -526,14 +387,9 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.deleteNetwork(id, n?.name ?? id);
-        await _loadSupabaseData();
-        return null;
-      }
-      await _firebase.deleteTelecomNetwork(
-          id, n?.name ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
+      await _supabase.deleteNetwork(id, n?.name ?? id);
+      await _loadSupabaseData();
+      return null;
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -547,12 +403,8 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.approveRequest(req);
-        await _loadSupabaseData();
-      } else if (currentUser != null) {
-        await _firebase.approveRequest(req, currentUser!);
-      }
+      await _supabase.approveRequest(req);
+      await _loadSupabaseData();
     } finally {
       isSyncing = false;
       notifyListeners();
@@ -564,56 +416,12 @@ class AppProvider extends ChangeNotifier {
     isSyncing = true;
     notifyListeners();
     try {
-      if (_backend.isSupabase) {
-        await _supabase.rejectRequest(requestId, reason);
-        await _loadSupabaseData();
-      } else if (currentUser != null) {
-        await _firebase.rejectRequest(requestId, reason, currentUser!);
-      }
+      await _supabase.rejectRequest(requestId, reason);
+      await _loadSupabaseData();
     } finally {
       isSyncing = false;
       notifyListeners();
     }
-  }
-
-  Future<void> reauthenticateCurrentUser() {
-    return _firebase.reauthenticateCurrentUser();
-  }
-
-  Future<String> createAdminHandover(String invitedEmail) async {
-    if (!isHeadOfDept) {
-      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
-    }
-    return _firebase.createAdminHandover(invitedEmail);
-  }
-
-  Future<Map<String, dynamic>> findMyAdminHandoverInvitation() {
-    return _firebase.findMyAdminHandoverInvitation();
-  }
-
-  Future<void> acceptAdminHandover(String operationId) async {
-    await _firebase.acceptAdminHandover(operationId);
-  }
-
-  Future<void> approveAdminHandover(String operationId) async {
-    if (!isHeadOfDept) {
-      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
-    }
-    await _firebase.approveAdminHandover(operationId);
-    headEmail = '';
-    currentRole = UserRoleType.technician;
-    notifyListeners();
-  }
-
-  Future<void> cancelAdminHandover(String operationId) async {
-    if (!isHeadOfDept) {
-      throw StateError('هذه العملية متاحة للمدير الحالي فقط.');
-    }
-    await _firebase.cancelAdminHandover(operationId);
-  }
-
-  Future<Map<String, dynamic>> getAdminHandoverStatus(String operationId) {
-    return _firebase.getAdminHandoverStatus(operationId);
   }
 
   Future<void> updateHeadEmail(String email) async {
