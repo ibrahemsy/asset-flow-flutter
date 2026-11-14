@@ -67,8 +67,7 @@ class _UsersScreenState extends State<UsersScreen> {
 
           const SizedBox(height: 20),
           // ---- جداول Supabase ----
-          if (_cfg.isSupabase)
-            Card(
+          Card(
               child: ExpansionTile(
                 leading: const Icon(Icons.table_chart_rounded, color: AppTheme.primary),
                 title: const Text('جداول Supabase المطلوبة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
