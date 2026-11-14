@@ -12,11 +12,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   Future<void> _handleLogin() async {
     setState(() => _isLoading = true);
     try {
-      await context.read<AppProvider>().loginWithGoogle();
+      await context.read<AppProvider>().loginWithEmail(_emailController.text, _passwordController.text);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -29,6 +31,13 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -109,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'استخدم حساب Google الخاص بالوزارة',
+                      'سجّل الدخول بحسابك المعتمد في Supabase',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppTheme.textSecondary,
@@ -117,35 +126,39 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 28),
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.username, AutofillHints.email],
+                      decoration: const InputDecoration(
+                        labelText: 'البريد الإلكتروني',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      autofillHints: const [AutofillHints.password],
+                      onSubmitted: (_) => _isLoading ? null : _handleLogin(),
+                      decoration: const InputDecoration(
+                        labelText: 'كلمة المرور',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       height: 52,
                       child: ElevatedButton.icon(
                         onPressed: _isLoading ? null : _handleLogin,
                         icon: _isLoading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Image.network(
-                                'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                                width: 22,
-                                height: 22,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.login, size: 22),
-                              ),
-                        label: Text(
-                          _isLoading ? 'جارٍ تسجيل الدخول...' : 'الدخول بحساب Google',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                            : const Icon(Icons.login_rounded),
+                        label: Text(_isLoading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ),
