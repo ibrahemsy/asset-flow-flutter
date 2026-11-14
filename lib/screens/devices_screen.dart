@@ -467,25 +467,6 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
-    );
-  }
-}
-
-
 /// حقل إدخال مع اقتراحات من الكتالوج (موديل / شركة)
 class _SuggestField extends StatefulWidget {
   final TextEditingController controller;
