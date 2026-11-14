@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
-        android:label="asset_flow_flutter"
+        android:label="نظام إدارة الأصول والعهدة"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
