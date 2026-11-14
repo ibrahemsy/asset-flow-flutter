@@ -64,8 +64,16 @@ class SupabaseService {
       currentUser?.email?.split('@').first ??
       'مستخدم';
 
-  bool isSystemAdmin() {
-    return BackendConfig().isSystemAdmin(userEmail);
+  /// Authorization is resolved by Postgres from private.admin_assignments.
+  /// Never trust a locally stored email allow-list for privileged access.
+  Future<String?> currentAppRole() async {
+    final role = await _client.rpc('current_app_role');
+    return role is String && role.isNotEmpty ? role : null;
+  }
+
+  Future<bool> isSystemAdmin() async {
+    final result = await _client.rpc('is_app_admin');
+    return result == true;
   }
 
   // -------------------- Helpers --------------------
@@ -99,7 +107,7 @@ class SupabaseService {
     required Map<String, dynamic> payload,
     String? targetDocId,
   }) async {
-    final admin = isSystemAdmin();
+    final admin = await isSystemAdmin();
     if (admin) {
       final id = payload['id'] ?? targetDocId;
       if (actionType.startsWith('delete') && id != null) {
@@ -311,7 +319,7 @@ class SupabaseService {
       );
 
   Future<void> approveRequest(PendingRequest req) async {
-    if (!isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
+    if (!await isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
     final table = req.targetCollection;
     final id = req.targetDocId ?? req.payload['id'];
     if (req.actionType.startsWith('delete') && id != null) {
