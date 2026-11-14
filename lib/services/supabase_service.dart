@@ -22,15 +22,15 @@ class SupabaseService {
   }
 
   static Future<void> initialize() async {
-    final cfg = BackendConfig();
-    await cfg.load();
-    if (!cfg.supabaseConfigured) {
-      throw Exception('لم يتم ضبط رابط ومفتاح Supabase');
-    }
-    await Supabase.initialize(
-      url: cfg.supabaseUrl,
-      anonKey: cfg.supabaseAnonKey,
+    const url = String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: 'https://cqqibuobtfgoxavskrjp.supabase.co',
     );
+    const publishableKey = String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue: 'sb_publishable_NReQPyV3Xd1RoR_RWfqVRg_opiQkOOA',
+    );
+    await Supabase.initialize(url: url, anonKey: publishableKey);
   }
 
   // -------------------- Auth --------------------
