@@ -37,7 +37,7 @@ class DashboardScreen extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'مرحباً، ${app.currentUser?.displayName?.split(' ').first ?? ''}',
+                  'مرحباً، ${app.currentUserName?.split(' ').first ?? ''}',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
