@@ -14,25 +14,33 @@ import 'utils/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تحميل إعدادات الخلفية (Firebase / Supabase)
   final backend = BackendConfig();
   await backend.load();
 
-  // Firebase دائماً متاح كخيار افتراضي
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint('Firebase init: $e');
-  }
-
-  // تهيئة Supabase إن كان مفعّلاً ومضبوطاً
-  if (backend.isSupabase && backend.supabaseConfigured) {
+  // تهيئة Supabase عند اختياره (الافتراضي)
+  if (backend.isSupabase) {
     try {
+      if (!backend.supabaseConfigured) {
+        await backend.setSupabaseCredentials(
+          url: backend.supabaseUrl,
+          anonKey: backend.supabaseAnonKey,
+        );
+      }
       await SupabaseService.initialize();
+      debugPrint('Supabase initialized');
     } catch (e) {
       debugPrint('Supabase init: $e');
+    }
+  }
+
+  // Firebase اختياري إن بقي مفعّلاً
+  if (backend.isFirebase) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (e) {
+      debugPrint('Firebase init: $e');
     }
   }
 
@@ -78,7 +86,7 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
 
-    if (app.isLoading && app.currentUser == null) {
+    if (app.isLoading && !app.isLoggedIn) {
       return const Scaffold(
         body: Center(
           child: Column(
