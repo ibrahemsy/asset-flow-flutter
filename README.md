@@ -10,7 +10,7 @@ flutter run
 ```
 
 ## التجهيز الكامل
-راجع **SETUP.md** (Firebase + Google Sheets API + OAuth + Supabase).
+راجع **SETUP.md** لإعداد Supabase وتشغيل نسختي Flutter Web وAndroid. لا يعتمد التطبيق على Firebase.
 
 ## Google Sheets داخل التطبيق
 شاشة **التقارير**:
