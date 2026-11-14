@@ -688,7 +688,7 @@ class ExcelService {
     await Share.shareXFiles(
       [
         XFile.fromData(
-          bytes,
+          Uint8List.fromList(bytes),
           name: filename,
           mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ),
