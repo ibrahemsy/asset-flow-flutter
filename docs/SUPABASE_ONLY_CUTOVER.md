@@ -13,14 +13,22 @@ Target services:
 
 ## Current repository findings (branch: feature/supabase-admin-handover)
 
-The current application is not yet Supabase-only:
-- `main.dart` initializes Firebase unconditionally and only initializes Supabase when a local backend flag enables it.
-- `AppProvider` subscribes to Firebase Auth and Firestore streams and calls `FirebaseService` for its CRUD operations.
-- The provider exposes `firebase_auth.User` as its current-user type.
-- `LoginScreen` calls Google sign-in through the Firebase-backed provider.
-- `SupabaseService` exists, but it is not the provider's active data/auth implementation.
-- `pubspec.yaml` still includes Firebase Core, Firebase Auth, Cloud Firestore, and Google Sign-In packages.
-- `BackendConfig` stores a local administrator email allow-list. This must not be used as an authorization source.
+The active Flutter code has been switched to Supabase as the sole runtime backend:
+- `main.dart` initializes Supabase at startup; Firebase initialization and generated Firebase options were removed.
+- `AppProvider` uses Supabase Auth sessions, role RPCs, and Supabase CRUD queries.
+- The login screen uses Supabase email/password authentication.
+- Firebase packages were removed from `pubspec.yaml`; Firebase service/config source files were deleted.
+- The public Supabase publishable key and project URL are used as build-time defaults and can be overridden with `SUPABASE_URL` and `SUPABASE_ANON_KEY`. No service-role key is shipped.
+- Operational rows are stored in JSONB `data` alongside selected normalized SQL columns.
+- Device form supports USB keyboard-wedge scanner input and has a camera scan action using `mobile_scanner`.
+- Google Sheets export is temporarily disabled; Excel export remains available. A separate Google OAuth integration is required before restoring Sheets export.
+
+Still unverified:
+- Flutter analyze, tests, Web build, and Android APK build have not yet completed successfully.
+- No live end-to-end Auth/RLS/CRUD test has been completed.
+- No user has been assigned a trusted administrator role; access remains fail-closed until the project owner provisions a verified Auth UID.
+- Realtime subscriptions and physical-device barcode testing remain outstanding.
+- The resolved lockfile and the full repository must still be audited for residual Firebase references.
 
 ## Cutover rules
 
@@ -37,15 +45,15 @@ The current application is not yet Supabase-only:
 
 ## Implementation sequence
 
-- [ ] Replace backend configuration with required Supabase URL and publishable key configuration; fail fast when missing.
-- [ ] Initialize Supabase once at application startup; remove Firebase initialization.
-- [ ] Refactor AppProvider to Supabase Auth state and Supabase-backed repositories; remove Firebase user types.
-- [ ] Replace Google/Firebase login with Supabase Auth. Email/password is the baseline; Google OAuth is optional and must be configured in Supabase Auth before enabling its UI.
-- [ ] Move devices, custody cards, movements, maintenance tickets, phone directory, telecom networks, audit logs, pending requests, and switch records to the existing Supabase schema.
-- [ ] Replace Firestore streams with Supabase queries and Realtime subscriptions.
+- [x] Replace backend configuration with Supabase URL and publishable key build-time defaults; allow build-time overrides.
+- [x] Initialize Supabase once at application startup; remove Firebase initialization.
+- [x] Refactor AppProvider to Supabase Auth state and Supabase-backed queries; remove Firebase user types.
+- [x] Replace Firebase login with Supabase email/password Auth. Google OAuth is not exposed in the login UI.
+- [x] Connect devices, custody cards, movements, maintenance tickets, phone directory, telecom networks, audit logs, and pending requests to Supabase. Switch records are not yet wired into AppProvider.
+- [ ] Supabase queries are wired; Realtime subscriptions remain to be implemented.
 - [ ] Implement role and approval rules in database policies/RPC/Edge Functions, then test both allowed and denied operations.
 - [ ] Migrate any required legacy records only after identifying and validating their source; do not silently discard data.
-- [ ] Remove Firebase packages, imports, generated configuration, and Firebase-specific assets after the codebase is free of Firebase references.
+- [x] Remove Firebase direct dependencies, runtime imports, generated configuration, and Firebase service source. Complete repository/lockfile audit remains.
 - [ ] Run formatting, static analysis, unit/widget tests, and release builds for Web and supported mobile platforms.
 
 ## Verification required before calling the app Supabase-only
