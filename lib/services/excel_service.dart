@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -687,18 +685,19 @@ class ExcelService {
     final bytes = excel.encode();
     if (bytes == null) return null;
 
-    final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/$filename';
-    final file = File(path);
-    await file.writeAsBytes(bytes);
-
     await Share.shareXFiles(
-      [XFile(path)],
+      [
+        XFile.fromData(
+          bytes,
+          name: filename,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ),
+      ],
       subject: filename,
       text: 'تقرير دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
     );
 
-    return path;
+    return filename;
   }
 }
 
