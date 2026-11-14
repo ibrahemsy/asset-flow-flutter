@@ -359,7 +359,7 @@ class SupabaseService {
   }
 
   Future<void> rejectRequest(String requestId, String reason) async {
-    if (!isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
+    if (!await isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
     await _client.from('pending_requests').update({
       'status': 'rejected',
       'reviewed_at': DateTime.now().toIso8601String(),
