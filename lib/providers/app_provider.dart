@@ -96,8 +96,14 @@ class AppProvider extends ChangeNotifier {
       auditLogs = results[6] as List<AuditLog>;
       phoneDirectory = results[7] as List<PhoneDirectoryEntry>;
       telecomNetworks = results[8] as List<TelecomNetworkInfo>;
-      networkSwitches = await _supabase.fetchNetworkSwitches();
       pendingRequests = results[9] as List<PendingRequest>;
+      try {
+        networkSwitches = await _supabase.fetchNetworkSwitches();
+      } catch (e) {
+        // A switch-table permission/schema issue must not block the core inventory.
+        networkSwitches = [];
+        debugPrint('Network switches load error: $e');
+      }
       catalog.syncFromDevices(devices);
     } catch (e, st) {
       debugPrint('Supabase load error: $e\n$st');
