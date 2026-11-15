@@ -309,7 +309,7 @@ class SupabaseService {
         'notes': '${mapping['notes'] ?? ''}'.trim(),
       });
     }
-    await _client.schema('private').rpc('save_network_switch_with_ports', params: {
+    await _client.rpc('save_network_switch_with_ports', params: {
       'p_switch': encoded,
       'p_ports': rows,
     });
