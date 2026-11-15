@@ -9,7 +9,7 @@ class SupabaseService {
 
   static const Set<String> _allowedOperationalTables = {
     'devices', 'custody_cards', 'movements', 'maintenance_tickets',
-    'phone_directory', 'telecom_networks',
+    'phone_directory', 'telecom_networks', 'network_switches',
   };
 
   SupabaseClient get _client => Supabase.instance.client;
@@ -110,6 +110,7 @@ class SupabaseService {
       'maintenance_tickets': ['ticket_number','device_name','serial_number','fault_description','station_or_dept','report_date','priority','assigned_tech','actions_taken','spare_parts_used','status'],
       'phone_directory': ['phone_number','employee_name','department','office_location','pbx_port_number','point_number','status','notes'],
       'telecom_networks': ['name','type','ip_range','gateway','bandwidth','frequency','location','status','notes'],
+      'network_switches': ['switch_number','name','model','location','ports_count','status','notes'],
     };
     const aliases = <String, String>{
       'serial_number':'serialNumber', 'asset_number':'assetNumber',
@@ -125,6 +126,7 @@ class SupabaseService {
       'actions_taken':'actionsTaken', 'spare_parts_used':'sparePartsUsed',
       'phone_number':'phoneNumber', 'office_location':'officeLocation', 'ip_range':'ipRange',
       'pbx_port_number':'pbxPortNumber', 'point_number':'pointNumber',
+      'switch_number':'switchNumber', 'ports_count':'portsCount',
     };
     for (final column in columns[table] ?? const <String>[]) {
       final value = pick(aliases[column] ?? column);
@@ -248,6 +250,34 @@ class SupabaseService {
             PhoneDirectoryEntry.fromMap(_decodeOperationalRow(r), r['id'] as String))
         .toList();
   }
+
+  Future<List<Map<String, dynamic>>> fetchNetworkSwitches() async {
+    final rows = await _client.from('network_switches').select().order('name');
+    return (rows as List).map((value) {
+      final row = Map<String, dynamic>.from(value);
+      final data = row['data'] is Map
+          ? Map<String, dynamic>.from(row['data'] as Map)
+          : <String, dynamic>{};
+      return {...row, ...data, 'id': row['id']};
+    }).toList();
+  }
+
+  Future<void> saveNetworkSwitch(Map<String, dynamic> item) => submitOrCommit(
+        table: 'network_switches',
+        actionType: 'save_network_switch',
+        title: 'حفظ سويتش شبكة',
+        details: '${item['name'] ?? item['switchNumber'] ?? item['id']}',
+        payload: item,
+      );
+
+  Future<void> deleteNetworkSwitch(String id, String name) => submitOrCommit(
+        table: 'network_switches',
+        actionType: 'delete_network_switch',
+        title: 'حذف سويتش شبكة',
+        details: name,
+        payload: {'id': id},
+        targetDocId: id,
+      );
 
   Future<List<TelecomNetworkInfo>> fetchNetworks() async {
     final rows = await _client.from('telecom_networks').select();
