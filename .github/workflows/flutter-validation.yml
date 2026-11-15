@@ -90,6 +90,11 @@ jobs:
       - name: Generate iOS platform scaffolding
         run: flutter create --platforms=ios --org com.ibrahemsy .
 
+      - name: Set iOS deployment target for camera scanner
+        run: |
+          ruby -0pi -e "gsub(/^# platform :ios, '13\\.0'/, \"platform :ios, '15.5'\")" ios/Podfile
+          grep -n "platform :ios" ios/Podfile
+
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
 
