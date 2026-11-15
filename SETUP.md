@@ -39,7 +39,10 @@ flutter build apk --release
 ```
 
 - الويب: `build/web/`
-- Android: `build/app/outputs/flutter-apk/app-release.apk`
+- Android APK: `build/app/outputs/flutter-apk/app-release.apk` (للتثبيت المباشر).
+- Android App Bundle: `build/app/outputs/bundle/release/app-release.aab` (صيغة Google Play).
+- لا ترفع APK/AAB إلى المتجر قبل التأكد من أن البناء موقّع بمفتاح الإصدار الخاص بمالك التطبيق. إذا لم تُضف أسرار التوقيع إلى GitHub Actions فالناتج مخصص للاختبار فقط.
+- iOS: يخرج CI نسخة `Runner.app` غير موقّعة للتحقق والبناء؛ التوزيع الفعلي يتطلب Apple Developer Team وشهادة توزيع وملف Provisioning Profile ثم إنشاء IPA موقّع.
 
 ## قارئ الباركود
 - USB: استخدم قارئاً يعمل بوضع Keyboard Wedge، ثم ضع المؤشر في حقل الباركود وامسح الرمز.
