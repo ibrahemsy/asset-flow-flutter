@@ -176,6 +176,21 @@ class AppProvider extends ChangeNotifier {
     if (!_isAdmin) throw Exception('صلاحية مدير النظام فقط');
     await _supabase.rejectRequest(id, reason); await _loadSettingsAndData();
   }
+  Future<String?> requestAdminHandover({
+    required String proposedAdminEmail,
+    required String targetProjectRef,
+  }) async {
+    if (!_isAdmin) return 'هذه العملية متاحة لمدير النظام الحالي فقط';
+    try {
+      return await _supabase.requestAdminHandover(
+        proposedAdminEmail: proposedAdminEmail,
+        targetProjectRef: targetProjectRef,
+      );
+    } catch (e) {
+      return 'تعذر إنشاء طلب التسليم: $e';
+    }
+  }
+
   Future<void> updateHeadEmail(String email) async {
     throw UnsupportedError('تعيين مدير النظام يتم من صلاحيات Supabase وليس بتغيير البريد من التطبيق.');
   }
