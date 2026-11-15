@@ -186,6 +186,12 @@ class MovementsScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      refCtrl.dispose();
+      fromCtrl.dispose();
+      toCtrl.dispose();
+      reasonCtrl.dispose();
+      barcodeCtrl.dispose();
+    });
   }
 }
