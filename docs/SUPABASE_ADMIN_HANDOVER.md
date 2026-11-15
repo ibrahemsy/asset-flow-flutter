@@ -36,7 +36,7 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Handover lifecycle
 
-- The current administrator can now use the Administration screen to enter the proposed administrator email and choose the destination Supabase Project Ref. The app calls `public.request_admin_handover`; the database verifies the caller is an administrator, validates the 20-character project ref, resolves the proposed manager from `auth.users`, prevents duplicate active requests, and records the destination in the private handover table. The proposed manager must already have registered in the source project's Auth.
+- The current administrator can now use the Administration screen to enter the proposed administrator email and choose the destination Supabase Project Ref. The app calls `public.request_admin_handover`; the database verifies the caller is an administrator, validates the 20-character project ref, links the proposed manager to an existing `auth.users` row when available (otherwise stores the nominee email for later acceptance), prevents duplicate active requests, and records the destination in the private handover table. The nominee email can be recorded before the nominee has an Auth identity in the source project; identity linking and acceptance must be completed before cutover.
 - The current administrator's submission is recorded as approval of the proposed destination/request; the new administrator must separately accept before the transfer workflow proceeds.
 - Generate a transfer manifest containing schemas, tables, constraints, indexes, views, functions, triggers, extensions, grants, RLS policies, counts and checksums.
 - Transfer schema and data while preserving primary keys and relationships; verify counts and checksums before cutover.
@@ -65,7 +65,7 @@ The handover preparation migration adds only internal metadata tables under the 
 ## Current administrator destination selection UI (2026-11-15)
 
 - Added to the manager-only Administration screen.
-- Required fields: new manager email (must already exist in source Auth) and destination Supabase Project Ref.
+- Required fields: new manager email and destination Supabase Project Ref. The nominee does not need to exist in source Auth at request-creation time; identity linking/acceptance is a later step.
 - The database RPC is callable by authenticated users only, but internally rejects anyone who is not the current application administrator.
 - The private helper is SECURITY DEFINER with an empty search_path; the exposed public wrapper is SECURITY INVOKER. No service-role key or destination credentials are requested in Flutter.
 - The app displays the generated request UUID and makes clear that the request does not start data copy or revoke the source manager.
