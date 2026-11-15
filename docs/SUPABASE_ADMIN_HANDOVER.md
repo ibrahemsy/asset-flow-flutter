@@ -14,13 +14,25 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Remaining application verification
 
-- Flutter static analysis and unit/widget tests have passed in CI.
-- The latest CI run is still validating the Web and Android release builds; consult the workflow run before treating either artifact as ready.
+- Latest recorded CI run: [Flutter validation #171](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43672961220).
+- Flutter static analysis and unit/widget tests have passed in that run.
+- At the last inspection, the Web release build was running and the Android APK build had not started. Neither downloadable artifact should be considered ready until both build and upload steps succeed.
 - A real interactive sign-in with the administrator's password has not been performed from a browser or physical phone in this session.
 - USB keyboard-wedge and camera barcode flows still require physical-device/browser testing.
-- Realtime subscriptions are not implemented.
+- The switch register CRUD workflow is wired through AppProvider and SupabaseService. Switches and their port mappings are fetched from the relational `network_switch_ports` table; saving a switch and its ports uses one PostgreSQL RPC transaction. Port rows can reference registered inventory devices by `device_id`.
+- The RPC validates administrator authorization, switch port bounds, duplicate port numbers, registered device references, and duplicate device assignments. It runs as SECURITY INVOKER so the caller's RLS policies remain in force.
+- Realtime subscriptions are not implemented; the current app refreshes data through its load/reload flow.
 - Google Sheets export is intentionally disabled until a separate Google OAuth integration is configured.
-- The switch register table exists in Supabase but its complete CRUD workflow is not yet wired into the Flutter provider/UI.
+- USB keyboard-wedge barcode readers and the camera scanner UI are implemented; hardware/browser acceptance testing is still outstanding.
+
+## Switch registry implementation
+
+- `public.network_switches` stores each switch once; a unique case-insensitive index protects non-empty switch numbers.
+- `public.network_switch_ports` stores each port independently, with a foreign key to the switch and an optional foreign key to `public.devices`.
+- Unique constraints prevent duplicate port numbers on a switch and prevent assigning one device to multiple ports.
+- `public.save_network_switch_with_ports(jsonb,jsonb)` saves the switch and complete port list atomically. It is SECURITY INVOKER, checks `auth.uid()` and `public.is_app_admin()`, and relies on table RLS policies for actual writes.
+- The app uses the same RPC when an administrator approves a pending switch-save request.
+- Switch deletion cascades to its port records.
 
 ## Handover lifecycle
 
