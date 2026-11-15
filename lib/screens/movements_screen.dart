@@ -118,8 +118,15 @@ class MovementsScreen extends StatelessWidget {
                       );
                       final msg = await app.saveMovement(m);
                       if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'تم الحفظ')));
+                        final failed = msg != null &&
+                            (msg.startsWith('خطأ:') || msg.contains('يجب تسجيل الدخول'));
+                        if (!failed) Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(msg ?? 'تم الحفظ'),
+                            backgroundColor: failed ? AppTheme.danger : null,
+                          ),
+                        );
                       }
                     },
                     child: const Text('حفظ السند'),
