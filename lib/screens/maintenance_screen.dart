@@ -196,6 +196,13 @@ class MaintenanceScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      ticketNoCtrl.dispose();
+      deviceNameCtrl.dispose();
+      faultCtrl.dispose();
+      stationCtrl.dispose();
+      techCtrl.dispose();
+      barcodeCtrl.dispose();
+    });
   }
 }
