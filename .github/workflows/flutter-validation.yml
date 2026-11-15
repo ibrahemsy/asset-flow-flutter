@@ -24,6 +24,9 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      - name: Upgrade Android file picker dependency
+        run: flutter pub upgrade file_picker
+
       - name: Resolve dependencies
         run: flutter pub get
 
