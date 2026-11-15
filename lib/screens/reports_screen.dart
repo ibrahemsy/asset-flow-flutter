@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_icons.dart';
@@ -129,41 +128,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
               const SizedBox(height: 16),
               const Text('Google Sheets', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              const SizedBox(height: 4),
-              const Text(
-                'يتطلب تسجيل الدخول بحساب Google والموافقة على صلاحية جداول البيانات.',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-              ),
               const SizedBox(height: 8),
-              _ActionTile(
-                icon: Icons.grid_on_rounded,
-                color: const Color(0xFF0F9D58),
-                title: 'تصدير الجرد إلى Google Sheets',
-                subtitle: 'إنشاء جدول جديد: أجهزة + عهدة',
-                onTap: _busy
-                    ? null
-                    : () => _run(() async {
-                          final result = await app.exportToGoogleSheets();
-                          setState(() => _status = 'تم إنشاء الجدول');
-                          if (mounted) {
-                            await _showSheetsSuccess(context, result.spreadsheetUrl);
-                          }
-                        }),
-              ),
-              _ActionTile(
-                icon: Icons.cloud_upload_rounded,
-                color: const Color(0xFF4285F4),
-                title: 'تقرير شامل على Google Sheets',
-                subtitle: 'أجهزة + عهدة + حركات + صيانة',
-                onTap: _busy
-                    ? null
-                    : () => _run(() async {
-                          final result = await app.exportFullToGoogleSheets();
-                          setState(() => _status = 'تم إنشاء التقرير على Sheets');
-                          if (mounted) {
-                            await _showSheetsSuccess(context, result.spreadsheetUrl);
-                          }
-                        }),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.textSecondary.withOpacity(0.25)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded, color: AppTheme.textSecondary),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'التصدير إلى Google Sheets غير متاح حالياً. سيُفعّل بعد إعداد تكامل Google OAuth مستقل. استخدم تصدير Excel في الوقت الحالي.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 16),
@@ -248,37 +232,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Future<void> _showSheetsSuccess(BuildContext context, String url) async {
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: AppTheme.success),
-            SizedBox(width: 8),
-            Text('تم التصدير'),
-          ],
-        ),
-        content: const Text('تم إنشاء جدول Google Sheets بنجاح. يمكنك فتحه الآن في المتصفح.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إغلاق')),
-          ElevatedButton.icon(
-            onPressed: () async {
-              final uri = Uri.parse(url);
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-              if (context.mounted) Navigator.pop(context);
-            },
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('فتح الجدول'),
-          ),
-        ],
-      ),
-    );
-  }
 }
-
 class _ActionTile extends StatelessWidget {
   final IconData icon;
   final Color color;
