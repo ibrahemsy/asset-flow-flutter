@@ -34,11 +34,12 @@ The active Flutter code on `feature/supabase-admin-handover` has been converted 
 - [x] Unassigned-user RLS test confirms no role/admin rights and no protected rows visible.
 - [x] Flutter static analysis passed in CI after updating `file_picker` and its API usage.
 - [x] Unit/widget tests passed in CI after the same update.
-- [ ] Latest Web build and Android APK build still need final CI confirmation and artifact upload.
+- [x] Latest CI run #175 completed Flutter static analysis, unit/widget tests, and the Web release build successfully.
+- [ ] Android APK release build and artifact upload are still running/pending in CI; do not distribute an APK until the artifact exists.
 - [ ] Real interactive login and end-to-end CRUD test in a browser and physical Android device.
 - [ ] USB scanner and camera scanning require physical-device/browser testing.
 - [ ] Realtime subscriptions are not implemented.
-- [ ] The independent network-switch/ports register is not yet connected to the Flutter provider/UI.
+- [x] The independent network-switch/ports register is connected to the Flutter provider/UI. Switch records and port records are read from Supabase; saves use an atomic SECURITY INVOKER RPC and respect RLS.
 - [ ] Google Sheets export requires separate Google OAuth configuration.
 - [ ] Production Android signing requires a private upload keystore and secure CI secrets; the current release build configuration uses the debug signing key for CI/testing.
 - [ ] Administrator handover to a different Supabase project has not been executed; target project and new administrator account must be verified first.
@@ -57,4 +58,4 @@ The active Flutter code on `feature/supabase-admin-handover` has been converted 
 
 ## Current status
 
-The Supabase-only source refactor and initial database access controls are in place on the feature branch. The project is not yet ready to be described as a fully production-published application: CI release builds, physical-device verification, production signing, and the remaining feature integrations above must be completed. The default branch remains untouched.
+The Supabase-only source refactor, initial database access controls, and switch/port workflow are in place on the feature branch. CI run #175 has passed static analysis, unit/widget tests, and the Web release build; Android release APK compilation and artifact upload are still pending. The project is not yet a fully production-published application: real interactive sign-in/CRUD checks, USB/camera acceptance testing, production Android signing, and administrator handover to a verified target Supabase project remain outstanding. The default branch remains untouched.
