@@ -13,7 +13,10 @@ class ApprovalsScreen extends StatelessWidget {
 
     if (!app.isHeadOfDept) {
       return const Center(
-        child: Text('هذه الصفحة متاحة فقط لرئيس الدائرة', style: TextStyle(color: AppTheme.textSecondary)),
+        child: Text(
+          'هذه الصفحة متاحة فقط لرئيس الدائرة',
+          style: TextStyle(color: AppTheme.textSecondary),
+        ),
       );
     }
 
@@ -39,14 +42,22 @@ class ApprovalsScreen extends StatelessWidget {
                     : ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: pending.length,
-                        itemBuilder: (_, i) => _RequestCard(req: pending[i], isPending: true),
+                        itemBuilder: (_, i) => _RequestCard(
+                          key: ValueKey(pending[i].id),
+                          req: pending[i],
+                          isPending: true,
+                        ),
                       ),
                 reviewed.isEmpty
                     ? const Center(child: Text('لا توجد طلبات مراجعة'))
                     : ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: reviewed.length,
-                        itemBuilder: (_, i) => _RequestCard(req: reviewed[i], isPending: false),
+                        itemBuilder: (_, i) => _RequestCard(
+                          key: ValueKey(reviewed[i].id),
+                          req: reviewed[i],
+                          isPending: false,
+                        ),
                       ),
               ],
             ),
@@ -57,15 +68,62 @@ class ApprovalsScreen extends StatelessWidget {
   }
 }
 
-class _RequestCard extends StatelessWidget {
+class _RequestCard extends StatefulWidget {
   final PendingRequest req;
   final bool isPending;
 
-  const _RequestCard({required this.req, required this.isPending});
+  const _RequestCard({super.key, required this.req, required this.isPending});
+
+  @override
+  State<_RequestCard> createState() => _RequestCardState();
+}
+
+class _RequestCardState extends State<_RequestCard> {
+  bool _busy = false;
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppTheme.danger : AppTheme.success,
+      ),
+    );
+  }
+
+  Future<void> _approve() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await context.read<AppProvider>().approveRequest(widget.req);
+      _showMessage('تم اعتماد الطلب');
+    } catch (error) {
+      _showMessage('تعذر اعتماد الطلب: $error', isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _reject() async {
+    if (_busy) return;
+    final reason = await _askReason(context);
+    if (reason == null || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await context.read<AppProvider>().rejectRequest(widget.req.id, reason);
+      _showMessage('تم رفض الطلب');
+    } catch (error) {
+      _showMessage('تعذر رفض الطلب: $error', isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final app = context.read<AppProvider>();
+    final req = widget.req;
+    final isPending = widget.isPending;
 
     return Card(
       child: Padding(
@@ -76,11 +134,17 @@ class _RequestCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(req.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  child: Text(
+                    req.title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
                 if (!isPending)
                   Chip(
-                    label: Text(req.status == 'approved' ? 'معتمد' : 'مرفوض', style: const TextStyle(fontSize: 11)),
+                    label: Text(
+                      req.status == 'approved' ? 'معتمد' : 'مرفوض',
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     backgroundColor: req.status == 'approved'
                         ? AppTheme.success.withOpacity(0.15)
                         : AppTheme.danger.withOpacity(0.15),
@@ -104,15 +168,14 @@ class _RequestCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await app.approveRequest(req);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('تم اعتماد الطلب'), backgroundColor: AppTheme.success),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.check, size: 18),
+                      onPressed: _busy ? null : _approve,
+                      icon: _busy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check, size: 18),
                       label: const Text('اعتماد'),
                       style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
                     ),
@@ -120,20 +183,12 @@ class _RequestCard extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final reason = await _askReason(context);
-                        if (reason != null) {
-                          await app.rejectRequest(req.id, reason);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('تم رفض الطلب'), backgroundColor: AppTheme.danger),
-                            );
-                          }
-                        }
-                      },
+                      onPressed: _busy ? null : _reject,
                       icon: const Icon(Icons.close, size: 18, color: AppTheme.danger),
                       label: const Text('رفض', style: TextStyle(color: AppTheme.danger)),
-                      style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.danger)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppTheme.danger),
+                      ),
                     ),
                   ),
                 ],
@@ -147,19 +202,33 @@ class _RequestCard extends StatelessWidget {
 
   Future<String?> _askReason(BuildContext context) async {
     final ctrl = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('سبب الرفض'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'أدخل سبب الرفض'), maxLines: 3),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, ctrl.text.trim().isEmpty ? 'بدون سبب' : ctrl.text.trim()),
-            child: const Text('رفض'),
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('سبب الرفض'),
+          content: TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(hintText: 'أدخل سبب الرفض'),
+            maxLines: 3,
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(
+                context,
+                ctrl.text.trim().isEmpty ? 'بدون سبب' : ctrl.text.trim(),
+              ),
+              child: const Text('رفض'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      ctrl.dispose();
+    }
   }
 }
