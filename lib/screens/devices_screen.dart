@@ -39,6 +39,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
           d.name.toLowerCase().contains(q) ||
           d.serialNumber.toLowerCase().contains(q) ||
           d.barcode.toLowerCase().contains(q) ||
+          d.assetNumber.toLowerCase().contains(q) ||
+          d.location.toLowerCase().contains(q) ||
           d.model.toLowerCase().contains(q) ||
           d.manufacturer.toLowerCase().contains(q)).toList();
     }
@@ -131,7 +133,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           leading: SectionIcon(icon: AppIcons.category(d.category), color: catColor, size: 42),
                           title: Text(d.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           subtitle: Text(
-                            '${d.serialNumber}${d.manufacturer.isNotEmpty ? ' • ${d.manufacturer}' : ''}',
+                            [
+                              d.serialNumber,
+                              if (d.assetNumber.isNotEmpty) 'الأصل: ${d.assetNumber}',
+                              if (d.barcode.isNotEmpty) 'باركود: ${d.barcode}',
+                              if (d.manufacturer.isNotEmpty) d.manufacturer,
+                            ].join(' • '),
                             style: const TextStyle(fontSize: 11),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
