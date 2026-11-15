@@ -38,7 +38,6 @@ jobs:
           flutter config --jdk-dir="$JAVA_HOME"
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
-          flutter doctor -v
 
       - name: Flutter version
         run: flutter --version
