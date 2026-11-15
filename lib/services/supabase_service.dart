@@ -96,6 +96,7 @@ class SupabaseService {
     required String table,
   }) {
     final values = Map<String, dynamic>.from(payload);
+    values.remove('portMappings'); // Stored in network_switch_ports.
     final id = values.remove('id');
     if (id == null || id.toString().isEmpty) {
       throw ArgumentError('يجب تحديد معرّف السجل قبل الحفظ');
@@ -174,6 +175,7 @@ class SupabaseService {
         await _client.from(table).delete().eq('id', id);
       } else {
         await _client.from(table).upsert(_encodeOperationalPayload(payload, table: table));
+        if (table == 'network_switches') await _syncNetworkSwitchPorts(payload);
       }
       await _logAudit(
         action: title,
@@ -253,13 +255,47 @@ class SupabaseService {
 
   Future<List<Map<String, dynamic>>> fetchNetworkSwitches() async {
     final rows = await _client.from('network_switches').select().order('name');
+    final ports = await _client.from('network_switch_ports').select().order('port_number');
+    final portsBySwitch = <String, List<Map<String, dynamic>>>{};
+    for (final raw in ports as List) {
+      final port = Map<String, dynamic>.from(raw);
+      final switchId = port['switch_id'] as String;
+      (portsBySwitch[switchId] ??= <Map<String, dynamic>>[]).add({
+        'id': port['id'], 'portNumber': '${port['port_number']}',
+        'pointNumber': port['point_number'] ?? '', 'officeLocation': port['office_location'] ?? '',
+        'deviceId': port['device_id'], 'connectedDevice': port['connected_device_label'] ?? '',
+        'notes': port['notes'] ?? '',
+      });
+    }
     return (rows as List).map((value) {
       final row = Map<String, dynamic>.from(value);
-      final data = row['data'] is Map
-          ? Map<String, dynamic>.from(row['data'] as Map)
-          : <String, dynamic>{};
-      return {...row, ...data, 'id': row['id']};
+      final data = row['data'] is Map ? Map<String, dynamic>.from(row['data'] as Map) : <String, dynamic>{};
+      final id = row['id'] as String;
+      data.remove('portMappings');
+      return {...row, ...data, 'id': id, 'portMappings': portsBySwitch[id] ?? <Map<String, dynamic>>[]};
     }).toList();
+  }
+
+  Future<void> _syncNetworkSwitchPorts(Map<String, dynamic> item) async {
+    final switchId = '${item['id']}';
+    final rawMappings = item['portMappings'];
+    final mappings = rawMappings is List ? rawMappings : const [];
+    final rows = <Map<String, dynamic>>[];
+    final seen = <int>{};
+    for (final raw in mappings) {
+      if (raw is! Map) continue;
+      final mapping = Map<String, dynamic>.from(raw);
+      final portNumber = int.tryParse('${mapping['portNumber'] ?? ''}');
+      if (portNumber == null || portNumber < 1 || !seen.add(portNumber)) throw ArgumentError('أرقام منافذ السويتش يجب أن تكون صحيحة وغير مكررة');
+      rows.add({
+        'id': mapping['id'] ?? 'swp_${switchId}_$portNumber', 'switch_id': switchId, 'port_number': portNumber,
+        'point_number': '${mapping['pointNumber'] ?? ''}'.trim(), 'office_location': '${mapping['officeLocation'] ?? ''}'.trim(),
+        'device_id': (mapping['deviceId']?.toString().trim().isNotEmpty ?? false) ? mapping['deviceId'] : null,
+        'connected_device_label': '${mapping['connectedDevice'] ?? ''}'.trim(), 'notes': '${mapping['notes'] ?? ''}'.trim(),
+      });
+    }
+    await _client.from('network_switch_ports').delete().eq('switch_id', switchId);
+    if (rows.isNotEmpty) await _client.from('network_switch_ports').insert(rows);
   }
 
   Future<void> saveNetworkSwitch(Map<String, dynamic> item) => submitOrCommit(
@@ -417,6 +453,7 @@ class SupabaseService {
       await _client.from(table).delete().eq('id', id);
     } else {
       await _client.from(table).upsert(_encodeOperationalPayload(req.payload, table: table));
+      if (table == 'network_switches') await _syncNetworkSwitchPorts(req.payload);
     }
     await _client.from('pending_requests').update({
       'status': 'approved',
