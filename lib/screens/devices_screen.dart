@@ -424,12 +424,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         assignedEmployee: existing?.assignedEmployee,
                       );
                       final msg = await app.saveDevice(device);
-                      if (context.mounted) {
-                        Navigator.pop(context);
+                      if (!context.mounted) return;
+                      final failed = msg != null &&
+                          (msg.startsWith('خطأ:') || msg == 'يجب تسجيل الدخول');
+                      if (failed) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(msg ?? 'تم الحفظ بنجاح')),
+                          SnackBar(
+                            content: Text(msg),
+                            backgroundColor: AppTheme.danger,
+                          ),
                         );
+                        return;
                       }
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(msg ?? 'تم الحفظ بنجاح')),
+                      );
                     },
                     child: const Text('حفظ'),
                   ),
