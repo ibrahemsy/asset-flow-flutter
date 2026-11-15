@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/login_validation.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,15 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoading) return;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final emailPattern = RegExp(r'^[^@ ]+@[^@ ]+\.[^@ ]+$');
-    String? validationMessage;
-    if (email.isEmpty) {
-      validationMessage = 'يرجى إدخال البريد الإلكتروني';
-    } else if (!emailPattern.hasMatch(email)) {
-      validationMessage = 'صيغة البريد الإلكتروني غير صحيحة';
-    } else if (password.isEmpty) {
-      validationMessage = 'يرجى إدخال كلمة المرور';
-    }
+    final validationMessage = loginValidationMessage(email: email, password: password);
     if (validationMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(validationMessage), backgroundColor: AppTheme.danger),
