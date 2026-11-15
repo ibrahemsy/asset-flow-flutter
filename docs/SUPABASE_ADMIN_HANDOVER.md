@@ -14,10 +14,10 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Remaining application verification
 
-- Latest completed Android/Web CI run: [Flutter validation #197](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43739938497), completed successfully on commit `cd44ca324e0ad0b9bd4fcd356c9155e595711904`.
-- Static analysis, unit/widget tests, Web release build, Android APK release build, and both artifact uploads passed in run #197.
-- Downloadable artifacts from run #197: `asset-flow-web` and `asset-flow-android-apk`. These are CI validation artifacts and are not yet a signed store release.
-- The repository did not contain an iOS/Xcode platform directory at the last tree audit. A macOS CI job has now been added to generate iOS scaffolding, build an unsigned iOS app, and upload the generated project and app bundle. That new job has not yet completed.
+- Latest completed all-platform CI run: [Flutter validation #201](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43746243103), completed successfully on commit `a0d7b0d48c07ce3dd0d066950a32bbb4e82ce529`.
+- Static analysis, unit/widget tests, Web release build, Android APK release build, unsigned iOS release build, and all four artifact uploads passed in run #201.
+- Artifacts from run #201: `asset-flow-web`, `asset-flow-android-apk`, `asset-flow-ios-unsigned-app`, and `asset-flow-ios-project`. Android is debug-signed for CI only; iOS is unsigned. Neither is a production store release.
+- The repository still generates the iOS/Xcode scaffolding inside the macOS CI job rather than committing it to the Flutter source tree. The iOS job now builds and uploads an unsigned app bundle and generated Xcode project.
 - Android release currently uses debug signing for CI validation only. A production Android keystore and protected CI secrets are still required before distribution.
 - A real interactive sign-in with the administrator's password has not been performed from a browser or physical phone in this session.
 - USB keyboard-wedge and camera barcode flows still require physical-device/browser testing.
@@ -72,3 +72,12 @@ The handover preparation migration adds only internal metadata tables under the 
 - The private helper is SECURITY DEFINER with an empty search_path; the exposed public wrapper is SECURITY INVOKER. No service-role key or destination credentials are requested in Flutter.
 - The app displays the generated request UUID and makes clear that the request does not start data copy or revoke the source manager.
 - Actual cross-project schema/data/Auth/Storage migration still requires a trusted server-side migration runner with separately provisioned credentials and a verified destination. Do not ask users to paste service-role keys into the app or chat.
+
+
+## Latest database maintenance (2026-11-15)
+
+- Added and applied migration `20261115043000_index_admin_handover_foreign_keys.sql` to cover five foreign keys across private handover/transfer metadata tables.
+- The Supabase performance advisor no longer reports unindexed foreign keys; the remaining notices are unused-index INFO notices expected on a newly provisioned/low-traffic project.
+- The security advisor reports `auth_leaked_password_protection` as WARN. Enable leaked-password protection in Supabase Dashboard → Authentication → Settings → Password Security before production use.
+- The private metadata tables have RLS enabled and no direct client policies; access is intended only through narrowly scoped RPC helpers. Public operational tables have RLS policies.
+- Follow-up validation after the index migration is running as [Flutter validation #202](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43747864086).
