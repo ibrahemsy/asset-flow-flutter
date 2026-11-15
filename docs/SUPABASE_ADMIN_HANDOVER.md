@@ -14,9 +14,11 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Remaining application verification
 
-- Latest recorded CI run for the current PR head: [Flutter validation #190](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43674487850). Static analysis and unit/widget tests passed; the Web build was still running at the latest check, Android build and artifact uploads were pending. No downloadable artifacts are available yet.
-- Flutter static analysis and unit/widget tests have passed in that run.
-- At the last inspection, the Web release build was running and the Android APK build had not started. Neither downloadable artifact should be considered ready until both build and upload steps succeed.
+- Latest completed Android/Web CI run: [Flutter validation #197](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43739938497), completed successfully on commit `cd44ca324e0ad0b9bd4fcd356c9155e595711904`.
+- Static analysis, unit/widget tests, Web release build, Android APK release build, and both artifact uploads passed in run #197.
+- Downloadable artifacts from run #197: `asset-flow-web` and `asset-flow-android-apk`. These are CI validation artifacts and are not yet a signed store release.
+- The repository did not contain an iOS/Xcode platform directory at the last tree audit. A macOS CI job has now been added to generate iOS scaffolding, build an unsigned iOS app, and upload the generated project and app bundle. That new job has not yet completed.
+- Android release currently uses debug signing for CI validation only. A production Android keystore and protected CI secrets are still required before distribution.
 - A real interactive sign-in with the administrator's password has not been performed from a browser or physical phone in this session.
 - USB keyboard-wedge and camera barcode flows still require physical-device/browser testing.
 - The switch register CRUD workflow is wired through AppProvider and SupabaseService. Switches and their port mappings are fetched from the relational `network_switch_ports` table; saving a switch and its ports uses one PostgreSQL RPC transaction. Port rows can reference registered inventory devices by `device_id`.
