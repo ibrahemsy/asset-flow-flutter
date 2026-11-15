@@ -89,7 +89,26 @@ class SupabaseService {
     const sourceProjectRef = 'cqqibuobtfgoxavskrjp';
     final email = proposedAdminEmail.trim().toLowerCase();
     final target = targetProjectRef.trim().toLowerCase();
-    if (!RegExp(r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+
+    final emailParts = email.split('@');
+    if (emailParts.length != 2 || emailParts.first.isEmpty || !emailParts.last.contains('.')) {
+      throw ArgumentError('يرجى إدخال بريد المدير الجديد بصورة صحيحة');
+    }
+    if (target.length != 20 || !RegExp(r'^[a-z0-9]+$').hasMatch(target)) {
+      throw ArgumentError('معرّف مشروع Supabase يجب أن يتكون من 20 حرفاً أو رقماً صغيراً');
+    }
+    if (target == sourceProjectRef) {
+      throw ArgumentError('يجب أن يكون المشروع الجديد مختلفاً عن المشروع الحالي');
+    }
+    final result = await _client.rpc('request_admin_handover', params: {
+      'p_proposed_admin_email': email,
+      'p_source_project_ref': sourceProjectRef,
+      'p_target_project_ref': target,
+    });
+    if (result == null || result.toString().isEmpty) {
+      throw StateError('لم يتم إنشاء طلب التسليم');
+    }
+    return result.toString();
+  }
   // -------------------- Helpers --------------------
 
   Map<String, dynamic> _decodeOperationalRow(dynamic value) {
