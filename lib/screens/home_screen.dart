@@ -14,6 +14,7 @@ import 'approvals_screen.dart';
 import 'audit_screen.dart';
 import 'users_screen.dart';
 import 'network_map_screen.dart';
+import 'network_switches_screen.dart';
 import 'help_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -48,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const TelecomScreen();
       case 'network_map':
         return const NetworkMapScreen();
+      case 'switches':
+        return const NetworkSwitchesScreen();
       case 'maintenance':
         return const MaintenanceScreen();
       case 'reports':
@@ -133,6 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     break;
                   case 'telecom':
                     app.setActiveTab('telecom');
+                    break;
+                  case 'switches':
+                    app.setActiveTab('switches');
                     break;
                   case 'movements':
                     app.setActiveTab('movements');
