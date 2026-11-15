@@ -76,7 +76,7 @@ class NetworkSwitchesScreen extends StatelessWidget {
                     _field(name, 'اسم السويتش', required: true),
                     _field(model, 'النوع / الموديل'),
                     _field(location, 'الموقع'),
-                    _field(ports, 'عدد المنافذ', keyboard: TextInputType.number),
+                    _field(ports, 'عدد المنافذ', keyboard: TextInputType.number, positiveInteger: true),
                     _field(notes, 'ملاحظات', maxLines: 2),
                     const SizedBox(height: 12),
                     Align(alignment: Alignment.centerRight, child: Text('توزيع المنافذ', style: Theme.of(context).textTheme.titleSmall)),
@@ -111,6 +111,33 @@ class NetworkSwitchesScreen extends StatelessWidget {
       ),
     );
     if (result == true && context.mounted) {
+      final app = context.read<AppProvider>();
+      final switchNumber = number.text.trim();
+      final duplicate = app.networkSwitches.any((candidate) {
+        final candidateId = '${candidate['id'] ?? ''}';
+        final candidateNumber = '${candidate['switchNumber'] ?? candidate['switch_number'] ?? ''}'.trim();
+        return candidateId != '${existing?['id'] ?? ''}' &&
+            candidateNumber.isNotEmpty &&
+            candidateNumber.toLowerCase() == switchNumber.toLowerCase();
+      });
+      if (duplicate) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('رقم السويتش مستخدم مسبقاً')),
+        );
+        number.dispose(); name.dispose(); model.dispose(); location.dispose(); ports.dispose(); notes.dispose();
+        return;
+      }
+      final maxPorts = int.tryParse(ports.text.trim()) ?? 0;
+      final portNumbers = mappings.map((m) => int.tryParse('${m['portNumber'] ?? ''}')).toList();
+      final hasInvalidPorts = portNumbers.any((p) => p == null || p < 1 || p > maxPorts) ||
+          portNumbers.whereType<int>().toSet().length != portNumbers.length;
+      if (hasInvalidPorts) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تأكد من أن أرقام المنافذ بين 1 و$maxPorts وغير مكررة')),
+        );
+        number.dispose(); name.dispose(); model.dispose(); location.dispose(); ports.dispose(); notes.dispose();
+        return;
+      }
       final item = <String, dynamic>{
         'id': existing?['id'] ?? const Uuid().v4(),
         'switchNumber': number.text.trim(),
@@ -130,7 +157,7 @@ class NetworkSwitchesScreen extends StatelessWidget {
     number.dispose(); name.dispose(); model.dispose(); location.dispose(); ports.dispose(); notes.dispose();
   }
 
-  static Widget _field(TextEditingController controller, String label, {bool required = false, TextInputType? keyboard, int maxLines = 1}) =>
+  static Widget _field(TextEditingController controller, String label, {bool required = false, bool positiveInteger = false, TextInputType? keyboard, int maxLines = 1}) =>
       Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: TextFormField(
@@ -138,7 +165,14 @@ class NetworkSwitchesScreen extends StatelessWidget {
           keyboardType: keyboard,
           maxLines: maxLines,
           decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-          validator: required ? (value) => value == null || value.trim().isEmpty ? 'هذا الحقل مطلوب' : null : null,
+          validator: (value) {
+            if (required && (value == null || value.trim().isEmpty)) return 'هذا الحقل مطلوب';
+            if (positiveInteger) {
+              final parsed = int.tryParse(value?.trim() ?? '');
+              if (parsed == null || parsed < 1) return 'أدخل عدداً صحيحاً أكبر من صفر';
+            }
+            return null;
+          },
         ),
       );
 
@@ -213,6 +247,7 @@ class _PortEditorRow extends StatelessWidget {
               Expanded(child: TextFormField(
                 initialValue: '${mapping['portNumber'] ?? ''}',
                 decoration: const InputDecoration(labelText: 'رقم المنفذ'),
+                validator: (value) { final n = int.tryParse(value?.trim() ?? ''); return n == null || n < 1 ? 'رقم منفذ صحيح مطلوب' : null; },
                 onChanged: (value) => mapping['portNumber'] = value,
               )),
               const SizedBox(width: 8),
