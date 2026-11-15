@@ -3,6 +3,8 @@ name: Flutter validation
 on:
   push:
     branches: [main, feature/supabase-admin-handover]
+  pull_request:
+    branches: [main, feature/supabase-admin-handover]
   workflow_dispatch:
 
 concurrency:
