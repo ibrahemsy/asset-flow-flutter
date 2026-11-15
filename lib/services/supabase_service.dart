@@ -174,8 +174,11 @@ class SupabaseService {
       if (actionType.startsWith('delete') && id != null) {
         await _client.from(table).delete().eq('id', id);
       } else {
-        await _client.from(table).upsert(_encodeOperationalPayload(payload, table: table));
-        if (table == 'network_switches') await _syncNetworkSwitchPorts(payload);
+        if (table == 'network_switches') {
+          await _saveNetworkSwitchAtomically(payload);
+        } else {
+          await _client.from(table).upsert(_encodeOperationalPayload(payload, table: table));
+        }
       }
       await _logAudit(
         action: title,
@@ -276,28 +279,41 @@ class SupabaseService {
     }).toList();
   }
 
-  Future<void> _syncNetworkSwitchPorts(Map<String, dynamic> item) async {
-    final switchId = '${item['id']}';
+  Future<void> _saveNetworkSwitchAtomically(Map<String, dynamic> item) async {
+    final encoded = _encodeOperationalPayload(item, table: 'network_switches');
     final rawMappings = item['portMappings'];
     final mappings = rawMappings is List ? rawMappings : const [];
     final rows = <Map<String, dynamic>>[];
-    final seen = <int>{};
+    final seenPorts = <int>{};
+    final seenDevices = <String>{};
+    final maxPorts = int.tryParse('${item['portsCount'] ?? item['ports_count'] ?? ''}');
+    if (maxPorts == null || maxPorts < 1) throw ArgumentError('عدد منافذ السويتش غير صالح');
     for (final raw in mappings) {
       if (raw is! Map) continue;
       final mapping = Map<String, dynamic>.from(raw);
       final portNumber = int.tryParse('${mapping['portNumber'] ?? ''}');
-      if (portNumber == null || portNumber < 1 || !seen.add(portNumber)) throw ArgumentError('أرقام منافذ السويتش يجب أن تكون صحيحة وغير مكررة');
+      final deviceId = mapping['deviceId']?.toString().trim();
+      if (portNumber == null || portNumber < 1 || portNumber > maxPorts || !seenPorts.add(portNumber)) {
+        throw ArgumentError('أرقام المنافذ يجب أن تكون صحيحة وغير مكررة وضمن عدد منافذ السويتش');
+      }
+      if (deviceId != null && deviceId.isNotEmpty && !seenDevices.add(deviceId)) {
+        throw ArgumentError('لا يمكن ربط الجهاز نفسه بأكثر من منفذ');
+      }
       rows.add({
-        'id': mapping['id'] ?? 'swp_${switchId}_$portNumber', 'switch_id': switchId, 'port_number': portNumber,
-        'point_number': '${mapping['pointNumber'] ?? ''}'.trim(), 'office_location': '${mapping['officeLocation'] ?? ''}'.trim(),
-        'device_id': (mapping['deviceId']?.toString().trim().isNotEmpty ?? false) ? mapping['deviceId'] : null,
-        'connected_device_label': '${mapping['connectedDevice'] ?? ''}'.trim(), 'notes': '${mapping['notes'] ?? ''}'.trim(),
+        'id': mapping['id'] ?? 'swp_${item['id']}_$portNumber',
+        'port_number': portNumber,
+        'point_number': '${mapping['pointNumber'] ?? ''}'.trim(),
+        'office_location': '${mapping['officeLocation'] ?? ''}'.trim(),
+        'device_id': deviceId == null || deviceId.isEmpty ? null : deviceId,
+        'connected_device_label': '${mapping['connectedDevice'] ?? ''}'.trim(),
+        'notes': '${mapping['notes'] ?? ''}'.trim(),
       });
     }
-    await _client.from('network_switch_ports').delete().eq('switch_id', switchId);
-    if (rows.isNotEmpty) await _client.from('network_switch_ports').insert(rows);
+    await _client.schema('private').rpc('save_network_switch_with_ports', params: {
+      'p_switch': encoded,
+      'p_ports': rows,
+    });
   }
-
   Future<void> saveNetworkSwitch(Map<String, dynamic> item) => submitOrCommit(
         table: 'network_switches',
         actionType: 'save_network_switch',
@@ -452,8 +468,11 @@ class SupabaseService {
     if (req.actionType.startsWith('delete') && id != null) {
       await _client.from(table).delete().eq('id', id);
     } else {
-      await _client.from(table).upsert(_encodeOperationalPayload(req.payload, table: table));
-      if (table == 'network_switches') await _syncNetworkSwitchPorts(req.payload);
+      if (table == 'network_switches') {
+        await _saveNetworkSwitchAtomically(req.payload);
+      } else {
+        await _client.from(table).upsert(_encodeOperationalPayload(req.payload, table: table));
+      }
     }
     await _client.from('pending_requests').update({
       'status': 'approved',
