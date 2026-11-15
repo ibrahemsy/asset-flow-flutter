@@ -202,23 +202,35 @@ class _PortEditorRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final port = TextEditingController(text: '${mapping['portNumber'] ?? ''}');
-    final point = TextEditingController(text: '${mapping['pointNumber'] ?? ''}');
-    final location = TextEditingController(text: '${mapping['officeLocation'] ?? ''}');
-    final device = TextEditingController(text: '${mapping['connectedDevice'] ?? ''}');
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(
           children: [
             Row(children: [
-              Expanded(child: TextFormField(controller: port, decoration: const InputDecoration(labelText: 'رقم المنفذ'))),
+              Expanded(child: TextFormField(
+                initialValue: '${mapping['portNumber'] ?? ''}',
+                decoration: const InputDecoration(labelText: 'رقم المنفذ'),
+                onChanged: (value) => mapping['portNumber'] = value,
+              )),
               const SizedBox(width: 8),
-              Expanded(child: TextFormField(controller: point, decoration: const InputDecoration(labelText: 'رقم النقطة'))),
+              Expanded(child: TextFormField(
+                initialValue: '${mapping['pointNumber'] ?? ''}',
+                decoration: const InputDecoration(labelText: 'رقم النقطة'),
+                onChanged: (value) => mapping['pointNumber'] = value,
+              )),
               IconButton(onPressed: onRemove, icon: const Icon(Icons.delete_outline)),
             ]),
-            TextFormField(controller: location, decoration: const InputDecoration(labelText: 'المكتب / الموقع')),
-            TextFormField(controller: device, decoration: const InputDecoration(labelText: 'الجهاز المتصل')),
+            TextFormField(
+              initialValue: '${mapping['officeLocation'] ?? ''}',
+              decoration: const InputDecoration(labelText: 'المكتب / الموقع'),
+              onChanged: (value) => mapping['officeLocation'] = value,
+            ),
+            TextFormField(
+              initialValue: '${mapping['connectedDevice'] ?? ''}',
+              decoration: const InputDecoration(labelText: 'الجهاز المتصل'),
+              onChanged: (value) => mapping['connectedDevice'] = value,
+            ),
           ],
         ),
       ),
