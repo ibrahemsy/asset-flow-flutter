@@ -497,36 +497,31 @@ class SupabaseService {
     if (!_allowedOperationalTables.contains(table)) {
       throw ArgumentError('جدول الطلب غير مسموح: $table');
     }
-    final id = req.targetDocId ?? req.payload['id'];
-    if (req.actionType.startsWith('delete') && id != null) {
-      await _client.from(table).delete().eq('id', id);
-    } else {
-      if (table == 'network_switches') {
-        await _saveNetworkSwitchAtomically(req.payload);
-      } else {
-        await _client.from(table).upsert(_encodeOperationalPayload(req.payload, table: table));
-      }
-    }
-    await _client.from('pending_requests').update({
-      'status': 'approved',
-      'reviewed_at': DateTime.now().toIso8601String(),
-      'reviewed_by': userEmail,
-    }).eq('id', req.id);
-    await _logAudit(
-      action: 'اعتماد: ${req.title}',
-      entity: table,
-      entityId: '$id',
-      details: req.details,
-    );
+
+    final isDelete = req.actionType.startsWith('delete');
+    final encodedPayload = isDelete
+        ? <String, dynamic>{}
+        : _encodeOperationalPayload(req.payload, table: table);
+
+    // The database function locks the request, applies the data change, updates
+    // the request status, and writes the audit entry in one transaction.
+    await _client.rpc('review_pending_request', params: {
+      'p_request_id': req.id,
+      'p_decision': 'approved',
+      'p_rejection_reason': null,
+      'p_encoded_payload': encodedPayload,
+      'p_raw_payload': req.payload,
+    });
   }
 
   Future<void> rejectRequest(String requestId, String reason) async {
     if (!await isSystemAdmin()) throw Exception('صلاحية مدير النظام فقط');
-    await _client.from('pending_requests').update({
-      'status': 'rejected',
-      'reviewed_at': DateTime.now().toIso8601String(),
-      'reviewed_by': userEmail,
-      'rejection_reason': reason,
-    }).eq('id', requestId);
+    await _client.rpc('review_pending_request', params: {
+      'p_request_id': requestId,
+      'p_decision': 'rejected',
+      'p_rejection_reason': reason.trim(),
+      'p_encoded_payload': <String, dynamic>{},
+      'p_raw_payload': <String, dynamic>{},
+    });
   }
 }
