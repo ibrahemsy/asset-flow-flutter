@@ -5,6 +5,10 @@ on:
     branches: [main, feature/supabase-admin-handover]
   workflow_dispatch:
 
+concurrency:
+  group: flutter-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
