@@ -31,6 +31,7 @@ class AppProvider extends ChangeNotifier {
   List<AuditLog> auditLogs = [];
   List<PhoneDirectoryEntry> phoneDirectory = [];
   List<TelecomNetworkInfo> telecomNetworks = [];
+  List<Map<String, dynamic>> networkSwitches = [];
   List<PendingRequest> pendingRequests = [];
 
   StreamSubscription<AuthState>? _authSubscription;
@@ -95,6 +96,7 @@ class AppProvider extends ChangeNotifier {
       auditLogs = results[6] as List<AuditLog>;
       phoneDirectory = results[7] as List<PhoneDirectoryEntry>;
       telecomNetworks = results[8] as List<TelecomNetworkInfo>;
+      networkSwitches = await _supabase.fetchNetworkSwitches();
       pendingRequests = results[9] as List<PendingRequest>;
       catalog.syncFromDevices(devices);
     } catch (e, st) {
@@ -107,7 +109,7 @@ class AppProvider extends ChangeNotifier {
 
   void _clearData() {
     devices = []; custodyCards = []; movements = []; tickets = [];
-    auditLogs = []; phoneDirectory = []; telecomNetworks = []; pendingRequests = [];
+    auditLogs = []; phoneDirectory = []; telecomNetworks = []; networkSwitches = []; pendingRequests = [];
   }
 
   Future<void> loginWithEmail(String email, String password) async {
@@ -154,6 +156,8 @@ class AppProvider extends ChangeNotifier {
     return _run(() => _supabase.deletePhone(id, e?.employeeName ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
   Future<String?> saveTelecomNetwork(TelecomNetworkInfo n) => _run(() => _supabase.saveNetwork(n));
+  Future<String?> saveNetworkSwitch(Map<String, dynamic> item) => _run(() => _supabase.saveNetworkSwitch(item));
+  Future<String?> deleteNetworkSwitch(String id, String name) => _run(() => _supabase.deleteNetworkSwitch(id, name), success: 'تم إرسال طلب حذف السويتش للاعتماد');
   Future<String?> deleteTelecomNetwork(String id) {
     final n = telecomNetworks.where((x) => x.id == id).firstOrNull;
     return _run(() => _supabase.deleteNetwork(id, n?.name ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
