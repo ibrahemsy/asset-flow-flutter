@@ -24,7 +24,7 @@ begin
   if auth.uid() is null or not public.is_app_admin() then
     raise exception 'صلاحية مدير النظام مطلوبة';
   end if;
-  if p_decision not in ('approved', 'rejected') then
+  if p_decision is null or p_decision not in ('approved', 'rejected') then
     raise exception 'قرار مراجعة الطلب غير صالح';
   end if;
 
@@ -35,7 +35,7 @@ begin
   if not found then
     raise exception 'طلب الاعتماد غير موجود';
   end if;
-  if v_request.status <> 'pending' then
+  if v_request.status is distinct from 'pending' then
     raise exception 'تمت مراجعة هذا الطلب مسبقاً';
   end if;
 
@@ -56,7 +56,7 @@ begin
   end if;
 
   v_table := v_request.target_collection;
-  if v_table not in (
+  if v_table is null or v_table not in (
     'devices', 'custody_cards', 'movements', 'maintenance_tickets',
     'phone_directory', 'telecom_networks', 'network_switches'
   ) then
