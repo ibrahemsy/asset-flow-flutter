@@ -47,7 +47,9 @@ class _CustodyScreenState extends State<CustodyScreen> {
                 c.items.any((item) =>
                     item.name.toLowerCase().contains(q) ||
                     item.description.toLowerCase().contains(q) ||
-                    item.serialNumber.toLowerCase().contains(q));
+                    item.serialNumber.toLowerCase().contains(q) ||
+                    item.itemCode.toLowerCase().contains(q) ||
+                    item.barcode.toLowerCase().contains(q));
         }
       }).toList();
     }
