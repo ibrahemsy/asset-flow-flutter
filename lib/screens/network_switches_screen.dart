@@ -59,7 +59,8 @@ class NetworkSwitchesScreen extends StatelessWidget {
         ?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? <Map<String, dynamic>>[];
     final result = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => Directionality(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(existing == null ? 'تسجيل سويتش جديد' : 'تعديل السويتش'),
@@ -81,12 +82,12 @@ class NetworkSwitchesScreen extends StatelessWidget {
                     Align(alignment: Alignment.centerRight, child: Text('توزيع المنافذ', style: Theme.of(context).textTheme.titleSmall)),
                     ...mappings.asMap().entries.map((entry) => _PortEditorRow(
                       mapping: entry.value,
-                      onRemove: () => mappings.removeAt(entry.key),
+                      onRemove: () => setDialogState(() => mappings.removeAt(entry.key)),
                     )),
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton.icon(
-                        onPressed: () => mappings.add({'portNumber': '${mappings.length + 1}', 'pointNumber': '', 'officeLocation': '', 'connectedDevice': '', 'notes': ''}),
+                        onPressed: () => setDialogState(() => mappings.add({'portNumber': '${mappings.length + 1}', 'pointNumber': '', 'officeLocation': '', 'connectedDevice': '', 'notes': ''})),
                         icon: const Icon(Icons.add),
                         label: const Text('إضافة ربط منفذ'),
                       ),
@@ -106,6 +107,7 @@ class NetworkSwitchesScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
     if (result == true && context.mounted) {
