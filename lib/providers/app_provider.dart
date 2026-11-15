@@ -141,9 +141,28 @@ class AppProvider extends ChangeNotifier {
   Future<String?> _run(Future<void> Function() action, {String success = 'تم إرسال الطلب لرئيس الدائرة للاعتماد'}) async {
     if (currentUser == null) return 'يجب تسجيل الدخول';
     isSyncing = true; notifyListeners();
-    try { await action(); await _loadSettingsAndData(); return _isAdmin ? null : success; }
-    catch (e) { return 'خطأ: $e'; }
-    finally { isSyncing = false; notifyListeners(); }
+    try {
+      await action();
+      await _loadSettingsAndData();
+      return _isAdmin ? null : success;
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        final details = '${e.message} ${e.details ?? ''}';
+        if (details.contains('devices_barcode_unique_nonblank_idx')) {
+          return 'خطأ: هذا الباركود مسجل مسبقاً لجهاز آخر.';
+        }
+        if (details.contains('devices_asset_number_unique_nonblank_idx')) {
+          return 'خطأ: رقم الأصل مسجل مسبقاً لجهاز آخر.';
+        }
+        return 'خطأ: توجد قيمة مكررة. تحقق من رقم الجهاز أو السجل قبل الحفظ.';
+      }
+      return 'خطأ: ${e.message}';
+    } catch (e) {
+      return 'خطأ: $e';
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
   }
 
   Future<String?> saveDevice(Device d) => _run(() async { await _supabase.saveDevice(d); });
