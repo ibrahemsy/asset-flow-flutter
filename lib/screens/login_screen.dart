@@ -19,7 +19,24 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLoading) return;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final emailPattern = RegExp(r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+
+    final emailPattern = RegExp(r'^[^@ ]+@[^@ ]+\.[^@ ]+$');
+    String? validationMessage;
+    if (email.isEmpty) {
+      validationMessage = 'يرجى إدخال البريد الإلكتروني';
+    } else if (!emailPattern.hasMatch(email)) {
+      validationMessage = 'صيغة البريد الإلكتروني غير صحيحة';
+    } else if (password.isEmpty) {
+      validationMessage = 'يرجى إدخال كلمة المرور';
+    }
+    if (validationMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationMessage), backgroundColor: AppTheme.danger),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
       await context.read<AppProvider>().loginWithEmail(email, password);
     } catch (e) {
       if (mounted) {
