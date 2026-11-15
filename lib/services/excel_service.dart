@@ -399,7 +399,7 @@ class ExcelService {
 
   /// اختيار ملف Excel واستيراد أجهزة منه
   Future<ImportResult<Device>> importDevicesFromFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
@@ -534,7 +534,7 @@ class ExcelService {
 
   /// استيراد بطاقات عهدة (بنية مبسطة)
   Future<ImportResult<CustodyCard>> importCustodyCardsFromFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
