@@ -1,4 +1,4 @@
-create or replace function private.save_network_switch_with_ports(
+create or replace function public.save_network_switch_with_ports(
   p_switch jsonb,
   p_ports jsonb
 ) returns void
@@ -20,7 +20,7 @@ begin
   v_id := nullif(p_switch->>'id', '');
   if v_id is null then raise exception 'معرّف السويتش مطلوب'; end if;
   if coalesce(p_switch->>'ports_count','') !~ '^[1-9][0-9]*$' then
-    raise exception 'عدد المنافذ غير صالح';
+    raise exception 'عدد منافذ السويتش غير صالح';
   end if;
   v_ports_count := (p_switch->>'ports_count')::integer;
   select count(*) into v_count from jsonb_to_recordset(p_ports) as p(port_number integer, device_id text);
@@ -39,7 +39,7 @@ begin
   end if;
   if (select count(*) from jsonb_to_recordset(p_ports) as p(port_number integer, device_id text) where p.device_id is not null)
     <> (select count(distinct p.device_id) from jsonb_to_recordset(p_ports) as p(port_number integer, device_id text) where p.device_id is not null) then
-    raise exception 'لا يمكن ربط الجهاز بأكثر من منفذ';
+    raise exception 'لا يمكن ربط الجهاز نفسه بأكثر من منفذ';
   end if;
   insert into public.network_switches
     (id, switch_number, name, model, location, ports_count, status, notes, data)
@@ -60,6 +60,5 @@ begin
   );
 end;
 $$;
-revoke all on function private.save_network_switch_with_ports(jsonb,jsonb) from public, anon;
-grant usage on schema private to authenticated;
-grant execute on function private.save_network_switch_with_ports(jsonb,jsonb) to authenticated;
+revoke all on function public.save_network_switch_with_ports(jsonb,jsonb) from public, anon;
+grant execute on function public.save_network_switch_with_ports(jsonb,jsonb) to authenticated;
