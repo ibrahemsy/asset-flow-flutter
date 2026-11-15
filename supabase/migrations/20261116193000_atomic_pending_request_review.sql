@@ -68,7 +68,7 @@ begin
   end if;
   if v_request.target_doc_id is not null
      and v_request.payload ? 'id'
-     and v_request.target_doc_id <> v_request.payload ->> 'id' then
+     and v_request.target_doc_id <> (v_request.payload ->> 'id') then
     raise exception 'معرّف السجل لا يطابق الطلب الأصلي';
   end if;
 
