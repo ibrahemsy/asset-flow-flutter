@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../models/models.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/device_lookup.dart';
 
 class MovementsScreen extends StatelessWidget {
   const MovementsScreen({super.key});
@@ -124,12 +125,7 @@ class MovementsScreen extends StatelessWidget {
                           );
                           if (scanned != null) {
                             barcodeCtrl.text = scanned;
-                            final match = app.devices.where((d) =>
-                              d.barcode.trim().toLowerCase() == scanned.trim().toLowerCase() ||
-                              d.serialNumber.trim().toLowerCase() == scanned.trim().toLowerCase() ||
-                              d.assetNumber.trim().toLowerCase() == scanned.trim().toLowerCase()
-                            );
-                            setModal(() => selectedDevice = match.isEmpty ? null : match.first);
+                            setModal(() => selectedDevice = findDeviceByScannedCode(app.devices, scanned));
                           }
                         },
                       ),
@@ -137,12 +133,7 @@ class MovementsScreen extends StatelessWidget {
                     onChanged: (value) {
                       final code = value.trim().toLowerCase();
                       if (code.isEmpty) return;
-                      final match = app.devices.where((d) =>
-                        d.barcode.trim().toLowerCase() == code ||
-                        d.serialNumber.trim().toLowerCase() == code ||
-                        d.assetNumber.trim().toLowerCase() == code
-                      );
-                      setModal(() => selectedDevice = match.isEmpty ? null : match.first);
+                      setModal(() => selectedDevice = findDeviceByScannedCode(app.devices, code));
                     },
                   ),
                   const SizedBox(height: 6),
