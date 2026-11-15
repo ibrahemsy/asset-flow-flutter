@@ -77,6 +77,9 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+
       - name: Upload Web build
         uses: actions/upload-artifact@v4
         with:
@@ -89,6 +92,13 @@ jobs:
         with:
           name: asset-flow-android-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Android App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
   build-ios-unsigned:
@@ -113,6 +123,12 @@ jobs:
           ruby -0pi -e "gsub(/IPHONEOS_DEPLOYMENT_TARGET = [^;]+;/, 'IPHONEOS_DEPLOYMENT_TARGET = 15.5;')" ios/Runner.xcodeproj/project.pbxproj
           grep -n "platform :ios" ios/Podfile
           grep -n "IPHONEOS_DEPLOYMENT_TARGET" ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Configure iOS camera and photo library privacy descriptions
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'يلزم الوصول إلى الكاميرا لمسح باركود الأصول.'" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'يلزم الوصول إلى الصور لإرفاق صور الأصول والعهد.'" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'يلزم حفظ الصور عند تصدير أو مشاركة مرفقات الأصول.'" ios/Runner/Info.plist
 
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
