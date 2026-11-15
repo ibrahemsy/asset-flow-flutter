@@ -63,6 +63,15 @@ begin
     raise exception 'جدول الطلب غير مسموح: %', coalesce(v_table, 'NULL');
   end if;
 
+  if p_raw_payload is distinct from v_request.payload then
+    raise exception 'البيانات المرسلة لا تطابق محتوى طلب الاعتماد';
+  end if;
+  if v_request.target_doc_id is not null
+     and v_request.payload ? 'id'
+     and v_request.target_doc_id <> v_request.payload ->> 'id' then
+    raise exception 'معرّف السجل لا يطابق الطلب الأصلي';
+  end if;
+
   v_id := coalesce(v_request.target_doc_id, v_request.payload ->> 'id');
   if v_id is null or v_id = '' then
     raise exception 'معرّف السجل المطلوب غير موجود';
@@ -99,7 +108,8 @@ begin
     perform public.save_network_switch_with_ports(p_encoded_payload, v_ports);
   else
     if jsonb_typeof(p_encoded_payload) <> 'object'
-       or coalesce(p_encoded_payload ->> 'id', '') <> v_id then
+       or coalesce(p_encoded_payload ->> 'id', '') <> v_id
+       or p_encoded_payload -> 'data' is distinct from (v_request.payload - 'id' - 'portMappings') then
       raise exception 'بيانات السجل أو معرّفه غير صالحة';
     end if;
     select string_agg(
