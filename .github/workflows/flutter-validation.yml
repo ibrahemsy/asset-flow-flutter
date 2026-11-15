@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   analyze-and-test:
@@ -31,30 +31,21 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Pin Flutter to Java 17
+        run: |
+          flutter config --jdk-dir="$JAVA_HOME"
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          flutter doctor -v
+
       - name: Flutter version
         run: flutter --version
 
       - name: Clean stale Flutter plugin registrants
         run: flutter clean
 
-      - name: Upgrade Android file picker dependency
-        run: flutter pub upgrade file_picker
-
-      - name: Resolve dependencies
-        run: flutter pub get
-
-      - name: Commit resolved dependency lockfile to feature branch
-        if: github.ref_name == 'feature/supabase-admin-handover'
-        run: |
-          if [ -n "$(git status --porcelain pubspec.lock)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add pubspec.lock
-            git commit -m "build: commit resolved Flutter dependency lockfile"
-            git fetch origin "${GITHUB_REF_NAME}"
-            git rebase FETCH_HEAD
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
 
       - name: Static analysis
         run: flutter analyze --no-pub --no-fatal-infos
