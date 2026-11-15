@@ -19,6 +19,10 @@ doc/api/
 # Platform secrets (ضع ملفاتك محلياً بعد clone)
 
 # Env / keys
+android/key.properties
+android/app/upload-keystore.jks
+*.jks
+*.keystore
 .env
 .env.*
 *.pem
