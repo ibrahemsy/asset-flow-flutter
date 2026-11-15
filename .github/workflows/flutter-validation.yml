@@ -17,6 +17,8 @@ permissions:
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -87,17 +89,35 @@ jobs:
           path: build/web/
           if-no-files-found: error
 
-      - name: Upload Android APK
+      - name: Upload Android APK (production-signed)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: asset-flow-android-apk
+          name: asset-flow-android-apk-production-signed
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
-      - name: Upload Android App Bundle
+      - name: Upload Android APK (testing only)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: asset-flow-android-aab
+          name: asset-flow-android-apk-testing-only
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Android App Bundle (production-signed)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-aab-production-signed
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Upload Android App Bundle (testing only)
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-aab-testing-only
           path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
 
