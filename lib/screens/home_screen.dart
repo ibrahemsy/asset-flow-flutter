@@ -278,7 +278,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               )
-            : _buildBody(app.activeTab),
+            : app.loadError != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_off_rounded, size: 52, color: AppTheme.danger),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'تعذر تحميل بيانات النظام',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(app.loadError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 18),
+                          ElevatedButton.icon(
+                            onPressed: app.isSyncing ? null : app.refreshData,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('إعادة المحاولة'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _buildBody(app.activeTab),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _bottomIndex,
           onDestinationSelected: (i) {
