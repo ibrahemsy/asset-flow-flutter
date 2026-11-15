@@ -216,14 +216,18 @@ class SupabaseService {
         details: details,
       );
     } else {
-      final reqId = 'req_${DateTime.now().millisecondsSinceEpoch}';
+      final requester = currentUser;
+      if (requester == null) {
+        throw StateError('يجب تسجيل الدخول قبل إرسال طلب الاعتماد');
+      }
+      final reqId = 'req_${DateTime.now().microsecondsSinceEpoch}';
       await _client.from('pending_requests').insert({
         'id': reqId,
         'action_type': actionType,
         'title': title,
         'details': details,
-        'requester_uid': currentUser?.id ?? '',
-        'requester_email': userEmail ?? '',
+        'requester_uid': requester.id,
+        'requester_email': requester.email ?? '',
         'requester_name': userName,
         'payload': payload,
         'target_collection': table,
