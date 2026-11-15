@@ -263,9 +263,27 @@ class _PortEditorRow extends StatelessWidget {
               decoration: const InputDecoration(labelText: 'المكتب / الموقع'),
               onChanged: (value) => mapping['officeLocation'] = value,
             ),
+            Consumer<AppProvider>(
+              builder: (context, app, _) {
+                final deviceIds = app.devices.map((device) => device.id).toSet();
+                final selected = mapping['deviceId']?.toString();
+                return DropdownButtonFormField<String>(
+                  value: selected != null && deviceIds.contains(selected) ? selected : null,
+                  decoration: const InputDecoration(labelText: 'ربط بجهاز مسجل في الأصول'),
+                  items: [
+                    const DropdownMenuItem<String>(value: null, child: Text('بدون جهاز مرتبط')),
+                    ...app.devices.map((device) => DropdownMenuItem<String>(
+                      value: device.id,
+                      child: Text('${device.name} — ${device.serialNumber}'),
+                    )),
+                  ],
+                  onChanged: (value) => mapping['deviceId'] = value,
+                );
+              },
+            ),
             TextFormField(
               initialValue: '${mapping['connectedDevice'] ?? ''}',
-              decoration: const InputDecoration(labelText: 'الجهاز المتصل'),
+              decoration: const InputDecoration(labelText: 'وصف الجهاز / ملاحظة'),
               onChanged: (value) => mapping['connectedDevice'] = value,
             ),
           ],
