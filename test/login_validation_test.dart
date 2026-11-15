@@ -3,12 +3,21 @@ import 'package:asset_flow_flutter/utils/login_validation.dart';
 
 void main() {
   group('Login validation', () {
-    test('accepts a valid email and trims surrounding whitespace', () {
+    test('accepts valid emails and trims surrounding whitespace', () {
       expect(isValidLoginEmail('  user@example.com  '), isTrue);
+      expect(isValidLoginEmail('user@sub.example.co.uk'), isTrue);
     });
 
     test('rejects missing, malformed, and whitespace-containing emails', () {
-      for (final value in ['', 'user', 'user@', 'user@example', 'a b@example.com']) {
+      for (final value in [
+        '',
+        'user',
+        'user@',
+        'user@example',
+        'user@.com',
+        'user@example..com',
+        'a b@example.com',
+      ]) {
         expect(isValidLoginEmail(value), isFalse, reason: value);
       }
     });
