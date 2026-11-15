@@ -2,6 +2,13 @@ import com.android.build.api.dsl.ApplicationExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    // The Flutter Gradle Plugin must be applied after Android and Kotlin plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
 val releaseSigningProperties = Properties()
 val releaseSigningPropertiesFile = rootProject.file("key.properties")
 if (releaseSigningPropertiesFile.exists()) {
@@ -12,13 +19,6 @@ val hasReleaseSigning = releaseStoreFile?.exists() == true &&
     listOf("storePassword", "keyPassword", "keyAlias").all {
         !releaseSigningProperties.getProperty(it).isNullOrBlank()
     }
-
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    // The Flutter Gradle Plugin must be applied after Android and Kotlin plugins.
-    id("dev.flutter.flutter-gradle-plugin")
-}
 
 extensions.configure<ApplicationExtension> {
     namespace = "com.ibrahemsy.asset_flow_flutter"
