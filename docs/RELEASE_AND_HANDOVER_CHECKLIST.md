@@ -4,9 +4,9 @@
 
 ## 1. الوضع المثبت حالياً
 
-- آخر تحقق آلي ناجح: [GitHub Actions #203](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43747993831).
-- التحليل والاختبارات وبناء Web وAndroid وiOS غير الموقّع نجحت.
-- ملفات البناء الأربعة متاحة كـ Artifacts حتى 2027-02-13.
+- آخر تحقق آلي ناجح: [GitHub Actions #204](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43756915695) على commit `769ccdbc1cd1268f6eba2335cad72dbc3ba44427`.
+- التحليل الثابت واختبارات Flutter وبناء Web وAndroid APK وiOS غير الموقّع نجحت جميعها.
+- ملفات البناء الأربعة متاحة كـ Artifacts حتى 2027-02-13: `asset-flow-web` و`asset-flow-android-apk` و`asset-flow-ios-unsigned-app` و`asset-flow-ios-project`.
 - المشروع المصدر الحالي: `cqqibuobtfgoxavskrjp`.
 - الخلفية التشغيلية هي Supabase فقط؛ لا تضع مفاتيح service-role أو كلمات مرور في تطبيق Flutter.
 - قارئ USB من نوع Keyboard Wedge وكاميرا الهاتف مدعومان برمجياً؛ القبول النهائي يحتاج أجهزة فعلية.
