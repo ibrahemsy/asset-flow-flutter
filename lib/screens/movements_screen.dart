@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../models/models.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
@@ -56,6 +57,7 @@ class MovementsScreen extends StatelessWidget {
     final fromCtrl = TextEditingController();
     final toCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
+    final barcodeCtrl = TextEditingController();
     MovementType type = MovementType.handover;
     Device? selectedDevice;
 
@@ -90,6 +92,61 @@ class MovementsScreen extends StatelessWidget {
                     items: app.devices.map((d) => DropdownMenuItem(value: d, child: Text('${d.name} (${d.serialNumber})'))).toList(),
                     onChanged: (v) => setModal(() => selectedDevice = v),
                   ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: barcodeCtrl,
+                    autofocus: false,
+                    decoration: InputDecoration(
+                      labelText: 'مسح الباركود (USB أو كاميرا الهاتف)',
+                      hintText: 'امسح الرمز أو اكتبه هنا',
+                      prefixIcon: const Icon(Icons.qr_code_scanner_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: 'فتح الكاميرا',
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        onPressed: () async {
+                          final scanned = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            builder: (scanContext) => SizedBox(
+                              height: MediaQuery.of(scanContext).size.height * 0.72,
+                              child: MobileScanner(
+                                onDetect: (capture) {
+                                  final value = capture.barcodes
+                                      .map((barcode) => barcode.rawValue)
+                                      .whereType<String>()
+                                      .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+                                  if (value.isNotEmpty && scanContext.mounted) {
+                                    Navigator.of(scanContext).pop(value);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                          if (scanned != null) {
+                            barcodeCtrl.text = scanned;
+                            final match = app.devices.where((d) =>
+                              d.barcode.trim().toLowerCase() == scanned.trim().toLowerCase() ||
+                              d.serialNumber.trim().toLowerCase() == scanned.trim().toLowerCase() ||
+                              d.assetNumber.trim().toLowerCase() == scanned.trim().toLowerCase()
+                            );
+                            setModal(() => selectedDevice = match.isEmpty ? null : match.first);
+                          }
+                        },
+                      ),
+                    ),
+                    onChanged: (value) {
+                      final code = value.trim().toLowerCase();
+                      if (code.isEmpty) return;
+                      final match = app.devices.where((d) =>
+                        d.barcode.trim().toLowerCase() == code ||
+                        d.serialNumber.trim().toLowerCase() == code ||
+                        d.assetNumber.trim().toLowerCase() == code
+                      );
+                      setModal(() => selectedDevice = match.isEmpty ? null : match.first);
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('يدعم قارئ USB الذي يكتب الرمز عبر لوحة المفاتيح، أو كاميرا الهاتف', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                   const SizedBox(height: 10),
                   TextField(controller: fromCtrl, decoration: const InputDecoration(labelText: 'من (المسلّم)')),
                   const SizedBox(height: 10),
