@@ -59,14 +59,30 @@ flutter build apk --release
 
 البناء الآلي الحالي يستخدم توقيع debug إذا لم يُجهّز المالك مفتاح نشر. لتفعيل توقيع الإصدار:
 
-1. أنشئ keystore خاصاً بالمالك على جهاز آمن باستخدام `keytool`، واحتفظ بنسخة احتياطية مشفرة منه.
+1. أنشئ keystore خاصاً بالمالك على جهاز آمن باستخدام الأمر التالي (غيّر alias إذا رغبت، ولا تستخدم كلمة مرور ضعيفة):
+   ```bash
+   keytool -genkeypair -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+   احفظ كلمات المرور واسم alias؛ ستحتاجها عند إعداد أسرار GitHub.
 2. لا ترفع keystore أو كلمات المرور إلى Git ولا ترسلها في المحادثة.
 3. أضف القيم التالية في إعدادات المستودع → Settings → Secrets and variables → Actions:
    - `ANDROID_KEYSTORE_BASE64`: محتوى keystore بعد تحويله إلى Base64.
    - `ANDROID_STORE_PASSWORD`: كلمة مرور keystore.
    - `ANDROID_KEY_ALIAS`: اسم المفتاح.
    - `ANDROID_KEY_PASSWORD`: كلمة مرور المفتاح.
+   لتحويل الملف إلى Base64 على Windows PowerShell (نفّذ الأمر من المجلد الذي يحتوي الملف):
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("upload-keystore.jks")) | Set-Clipboard
+   ```
+   وعلى Linux/macOS:
+   ```bash
+   base64 -w 0 upload-keystore.jks
+   ```
 4. سيجهز GitHub Actions ملف التوقيع مؤقتاً أثناء البناء، ثم يستخدم توقيع المالك تلقائياً.
 5. احتفظ بالمفتاح وكلمات المرور بأمان؛ فقدان مفتاح التوقيع قد يمنع تحديث التطبيق المنشور بنفس هوية الحزمة.
 
 إذا لم تُضف الأسرار، يبقى APK الناتج مخصصاً للاختبار وليس للنشر في المتجر.
+
+
+### توقيع iOS
+بناء iOS الموجود في CI غير موقع (no-codesign) ولا يمكن تثبيته أو توزيعه كنسخة إنتاجية قبل إعداد Apple Developer signing. يتطلب ذلك حساب Apple Developer، وApple Distribution certificate، وProvisioning Profile، وTeam ID، ثم إعداد أسرار GitHub Actions المناسبة. لا ترفع ملفات الشهادة أو كلمات مرورها إلى Git.
