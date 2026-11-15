@@ -27,7 +27,7 @@ class DashboardScreen extends StatelessWidget {
     final activeCards = app.custodyCards.where((c) => c.status == 'active').length;
 
     return RefreshIndicator(
-      onRefresh: () async {},
+      onRefresh: app.refreshData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
