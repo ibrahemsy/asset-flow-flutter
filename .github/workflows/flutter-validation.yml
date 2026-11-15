@@ -2,7 +2,7 @@ name: Flutter validation
 
 on:
   push:
-    branches: [main, feature/supabase-admin-handover]
+    branches: [main]
   pull_request:
     branches: [main, feature/supabase-admin-handover]
   workflow_dispatch:
