@@ -196,6 +196,8 @@ class NetworkSwitchesScreen extends StatelessWidget {
 
   static void _showDetails(BuildContext context, Map<String, dynamic> item) {
     final mappings = item['portMappings'] is List ? item['portMappings'] as List : const [];
+    final devices = context.read<AppProvider>().devices;
+    final devicesById = {for (final device in devices) device.id: device};
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -216,10 +218,15 @@ class NetworkSwitchesScreen extends StatelessWidget {
                 if (mappings.isEmpty) const Text('لم تتم إضافة ربط للمنافذ'),
                 ...mappings.map((raw) {
                   final port = Map<String, dynamic>.from(raw as Map);
+                  final linkedDevice = devicesById[port['deviceId']?.toString()];
+                  final deviceDescription = linkedDevice == null
+                      ? (port['connectedDevice'] ?? 'بدون جهاز مرتبط').toString()
+                      : '${linkedDevice.name} • ${linkedDevice.serialNumber}';
                   return ListTile(
                     dense: true,
+                    leading: const Icon(Icons.settings_ethernet),
                     title: Text('منفذ ${port['portNumber'] ?? '-'} • نقطة ${port['pointNumber'] ?? '-'}'),
-                    subtitle: Text('${port['officeLocation'] ?? ''} • ${port['connectedDevice'] ?? ''}'),
+                    subtitle: Text('${port['officeLocation'] ?? ''} • $deviceDescription'),
                   );
                 }),
               ],
