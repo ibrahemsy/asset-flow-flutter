@@ -92,8 +92,10 @@ jobs:
 
       - name: Set iOS deployment target for camera scanner
         run: |
-          ruby -0pi -e "gsub(/^# platform :ios, '13\\.0'/, \"platform :ios, '15.5'\")" ios/Podfile
+          ruby -0pi -e "gsub(/^#\\s*platform\\s*:ios,\\s*'[^']+'/, \"platform :ios, '15.5'\")" ios/Podfile
+          ruby -0pi -e "gsub(/IPHONEOS_DEPLOYMENT_TARGET = [^;]+;/, 'IPHONEOS_DEPLOYMENT_TARGET = 15.5;')" ios/Runner.xcodeproj/project.pbxproj
           grep -n "platform :ios" ios/Podfile
+          grep -n "IPHONEOS_DEPLOYMENT_TARGET" ios/Runner.xcodeproj/project.pbxproj
 
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
