@@ -28,6 +28,9 @@ jobs:
       - name: Flutter version
         run: flutter --version
 
+      - name: Clean stale Flutter plugin registrants
+        run: flutter clean
+
       - name: Upgrade Android file picker dependency
         run: flutter pub upgrade file_picker
 
