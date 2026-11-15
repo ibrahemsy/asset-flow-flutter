@@ -216,6 +216,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const PopupMenuItem(
+                  value: 'switches',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.hub_outlined, size: 20),
+                    title: Text('السويتشات والمنافذ', style: TextStyle(fontSize: 13)),
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'audit',
                   child: ListTile(
                     dense: true,
