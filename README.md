@@ -23,6 +23,8 @@ flutter run \
 
 راجع [SETUP.md](SETUP.md) وخطط الترحيل داخل `supabase/migrations/` قبل ربط مشروع Supabase آخر.
 
+لإعداد توقيع Android الإنتاجي، أنشئ keystore خاصاً بالمالك، واحفظه خارج Git، ثم أضف أسراره إلى GitHub Actions كما هو موضح في SETUP.md.
+
 ## بناء النسختين
 
 ```bash
@@ -34,6 +36,7 @@ flutter build apk --release
 
 - ملفات الويب: `build/web/`
 - ملف Android APK: `build/app/outputs/flutter-apk/app-release.apk`
+- يدعم Gradle توقيع إصدار Android بمفتاح المالك عند توفير `android/key.properties` وملف keystore؛ من دون ذلك يستخدم CI توقيع debug لأغراض الاختبار فقط.
 
 ## الباركود
 
