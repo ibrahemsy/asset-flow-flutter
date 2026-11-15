@@ -20,6 +20,7 @@ class AppProvider extends ChangeNotifier {
   bool isLoading = true;
   bool isSyncing = false;
   bool isOffline = false;
+  String? loadError;
   bool _isAdmin = false;
   String activeTab = 'dashboard';
   bool requestOpenAddDevice = false;
@@ -77,6 +78,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _loadSettingsAndData() async {
     isLoading = true;
+    loadError = null;
     notifyListeners();
     try {
       final results = await Future.wait([
@@ -112,6 +114,7 @@ class AppProvider extends ChangeNotifier {
       }
       catalog.syncFromDevices(devices);
     } catch (e, st) {
+      loadError = 'تعذر تحميل بيانات النظام من Supabase. تحقق من الاتصال وصلاحيات الحساب ثم أعد المحاولة.';
       debugPrint('Supabase load error: $e\n$st');
     } finally {
       isLoading = false;
