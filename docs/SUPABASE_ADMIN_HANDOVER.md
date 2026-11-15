@@ -14,7 +14,7 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Remaining application verification
 
-- Latest recorded CI run: [Flutter validation #171](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43672961220).
+- Latest recorded CI run for the current PR head: [Flutter validation #190](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43674487850). Static analysis and unit/widget tests passed; the Web build was still running at the latest check, Android build and artifact uploads were pending. No downloadable artifacts are available yet.
 - Flutter static analysis and unit/widget tests have passed in that run.
 - At the last inspection, the Web release build was running and the Android APK build had not started. Neither downloadable artifact should be considered ready until both build and upload steps succeed.
 - A real interactive sign-in with the administrator's password has not been performed from a browser or physical phone in this session.
