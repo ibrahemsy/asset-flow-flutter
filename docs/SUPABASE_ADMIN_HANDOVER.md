@@ -36,8 +36,8 @@ The active Flutter application now uses Supabase as its only runtime backend:
 
 ## Handover lifecycle
 
-- The current administrator creates a request naming the proposed administrator and target project reference.
-- The current administrator explicitly approves; the new administrator separately accepts.
+- The current administrator can now use the Administration screen to enter the proposed administrator email and choose the destination Supabase Project Ref. The app calls `public.request_admin_handover`; the database verifies the caller is an administrator, validates the 20-character project ref, resolves the proposed manager from `auth.users`, prevents duplicate active requests, and records the destination in the private handover table. The proposed manager must already have registered in the source project's Auth.
+- The current administrator's submission is recorded as approval of the proposed destination/request; the new administrator must separately accept before the transfer workflow proceeds.
 - Generate a transfer manifest containing schemas, tables, constraints, indexes, views, functions, triggers, extensions, grants, RLS policies, counts and checksums.
 - Transfer schema and data while preserving primary keys and relationships; verify counts and checksums before cutover.
 - Transfer Storage buckets and objects separately if present.
@@ -60,3 +60,13 @@ These are point-in-time findings and must be rechecked immediately before a real
 ## Important boundaries
 
 The handover preparation migration adds only internal metadata tables under the non-exposed `private` schema. It does **not** transfer ownership, data, Auth users, Storage objects, secrets, or project billing. The new administrator's Auth account and target project must be verified before any transfer. No administrator has been removed or replaced.
+
+
+## Current administrator destination selection UI (2026-11-15)
+
+- Added to the manager-only Administration screen.
+- Required fields: new manager email (must already exist in source Auth) and destination Supabase Project Ref.
+- The database RPC is callable by authenticated users only, but internally rejects anyone who is not the current application administrator.
+- The private helper is SECURITY DEFINER with an empty search_path; the exposed public wrapper is SECURITY INVOKER. No service-role key or destination credentials are requested in Flutter.
+- The app displays the generated request UUID and makes clear that the request does not start data copy or revoke the source manager.
+- Actual cross-project schema/data/Auth/Storage migration still requires a trusted server-side migration runner with separately provisioned credentials and a verified destination. Do not ask users to paste service-role keys into the app or chat.
