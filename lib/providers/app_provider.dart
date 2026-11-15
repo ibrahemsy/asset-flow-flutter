@@ -47,6 +47,12 @@ class AppProvider extends ChangeNotifier {
   void clearOpenAddDevice() { requestOpenAddDevice = false; }
   void setActiveTab(String tab) { activeTab = tab; notifyListeners(); }
 
+  /// Reloads the signed-in user's dashboard data when they pull to refresh.
+  Future<void> refreshData() async {
+    if (currentUser == null || isLoading || isSyncing) return;
+    await _loadSettingsAndData();
+  }
+
   Future<void> _init() async {
     await catalog.load();
     currentUser = _supabase.currentUser;
