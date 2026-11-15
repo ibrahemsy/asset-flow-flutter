@@ -2,25 +2,25 @@
 
 ## Current implementation audit (2026-11-15)
 
-The Flutter application is **not yet Supabase-first**, despite containing a Supabase service:
+The active Flutter application now uses Supabase as its only runtime backend:
 
-- `lib/main.dart` initializes Firebase unconditionally and the root `AuthGate` reads `AppProvider`.
-- `AppProvider` subscribes to `FirebaseService.authStateChanges` and routes its CRUD operations through `FirebaseService`.
-- `BackendConfig` defaults to Firebase. It persists an administrator email allow-list in local `SharedPreferences`.
-- `SupabaseService` has email/password methods and CRUD helpers, but it is not wired into `AppProvider`'s active authentication/data lifecycle.
-- `SupabaseService.isSystemAdmin()` currently trusts the local email allow-list. A client-side preference is not an authorization boundary and must not grant administrator permissions.
-- The Supabase SQL schema currently creates the business tables but does not establish a complete role model or RLS policies. The live source project audit found RLS enabled on the nine public tables but no policies. This means client access will be denied; do not fix this with permissive public policies.
+- `main.dart` initializes Supabase; Firebase initialization and Firebase service/config files are absent from the active source tree.
+- `AppProvider` uses Supabase Auth sessions, trusted role RPCs, and Supabase CRUD.
+- Email/password login is provided by Supabase Auth.
+- The application uses the public publishable key only; no service-role key is embedded in the client.
+- The connected project has RLS policies on the operational tables. Direct operational writes are restricted to `primary_admin` / `admin`; ordinary provisioned users submit approval requests.
+- The Auth account `baselformobile@gmail.com` is assigned `primary_admin` in `private.admin_assignments`. The role RPC and administrator check were tested using that Auth UID.
+- An unassigned authenticated test identity receives no application role, no admin permission, and no rows from protected operational/pending-request queries.
 
-## Required target architecture
+## Remaining application verification
 
-1. Use Supabase Auth as the sole identity provider for both Flutter Web and mobile.
-2. Use one shared repository/data layer for both builds; keep platform-specific barcode input behind adapters:
-   - Web/desktop: USB HID scanner input behaves as keyboard input; capture focused/scanner input and support manual entry.
-   - Mobile: camera scanning via `mobile_scanner`.
-3. Put roles in a protected database table (or trusted `app_metadata` set only by trusted server-side code). Never authorize from email strings, `user_metadata`, or local preferences.
-4. Enforce every data operation in PostgreSQL RLS. Use narrowly scoped policies for authenticated users and a trusted admin role check. Do not ship a service-role key in Flutter.
-5. Put privileged operations (role assignment, approvals, handover execution, migration orchestration) behind authenticated Edge Functions/server-side code. Validate caller identity and current role on every request.
-6. Keep audit records append-only and include actor ID, timestamp, action, target, and transfer correlation ID.
+- Flutter static analysis and unit/widget tests have passed in CI.
+- The latest CI run is still validating the Web and Android release builds; consult the workflow run before treating either artifact as ready.
+- A real interactive sign-in with the administrator's password has not been performed from a browser or physical phone in this session.
+- USB keyboard-wedge and camera barcode flows still require physical-device/browser testing.
+- Realtime subscriptions are not implemented.
+- Google Sheets export is intentionally disabled until a separate Google OAuth integration is configured.
+- The switch register table exists in Supabase but its complete CRUD workflow is not yet wired into the Flutter provider/UI.
 
 ## Handover lifecycle
 
@@ -37,15 +37,14 @@ The Flutter application is **not yet Supabase-first**, despite containing a Supa
 ## Current source-project audit snapshot
 
 - Supabase project ref: `cqqibuobtfgoxavskrjp`.
-- Nine public business tables; all currently empty at the time of the audit.
-- Two Auth users; identity-to-administrator assignment has not been confirmed.
-- No Storage buckets and no Edge Functions were found at audit time.
-- 26 custom database functions require definition/signature review before schema transfer.
-- No recorded migrations were found before the handover preparation migration.
-- No public RLS policies were found, although RLS is enabled on the nine business tables.
+- The operational tables currently contain zero rows; no legacy asset/custody data has been migrated into this project.
+- `baselformobile@gmail.com` is the active `primary_admin` assignment.
+- The requested proposed administrator `ferasnatof@gmail.com` was not found in Auth during the latest check.
+- The handover metadata tables are internal to the non-exposed `private` schema.
+- No target Supabase project has been identified or verified, so a real project/database handover has not been executed.
 
 These are point-in-time findings and must be rechecked immediately before a real transfer.
 
 ## Important boundaries
 
-The handover preparation migration adds only internal metadata tables under the non-exposed `private` schema. It does **not** transfer ownership, data, Auth users, Storage objects, secrets, or project billing. It does not designate either existing Auth user as administrator. The target project has not yet been created, so no cutover is possible yet.
+The handover preparation migration adds only internal metadata tables under the non-exposed `private` schema. It does **not** transfer ownership, data, Auth users, Storage objects, secrets, or project billing. The new administrator's Auth account and target project must be verified before any transfer. No administrator has been removed or replaced.
