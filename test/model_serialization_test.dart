@@ -87,5 +87,108 @@ void main() {
       expect(restored.payload['name'], 'حاسوب');
       expect(restored.status, 'pending');
     });
+
+    test('Device preserves nested port mappings and attachments', () {
+      final device = Device(
+        id: 'device-network-1',
+        name: 'سويتش تجريبي',
+        category: DeviceCategory.switchDevice,
+        manufacturer: 'Cisco',
+        model: 'Catalyst',
+        serialNumber: 'SW-001',
+        barcode: 'SW-BAR-001',
+        assetNumber: 'AST-SW-001',
+        portsCount: 24,
+        portMappings: [
+          NetworkPortMapping(
+            portNumber: '1',
+            pointNumber: 'P-01',
+            officeLocation: 'المكتب 1',
+            connectedDevice: 'PC-01',
+            notes: 'منفذ مستخدم',
+          ),
+        ],
+        purchaseDate: '2026-01-01',
+        supplier: 'المورد',
+        condition: DeviceCondition.good,
+        status: DeviceStatus.inWarehouse,
+        location: 'غرفة الشبكة',
+        attachments: [
+          DeviceAttachment(
+            id: 'att-1',
+            name: 'صورة الجهاز',
+            type: 'image',
+            dataUrl: 'data:image/png;base64,AA==',
+            uploadedAt: '2026-11-15T00:00:00Z',
+          ),
+        ],
+        createdAt: '2026-11-15T00:00:00Z',
+        updatedAt: '2026-11-15T00:00:00Z',
+      );
+
+      final restored = Device.fromMap(device.toMap(), device.id);
+
+      expect(restored.portsCount, 24);
+      expect(restored.portMappings, hasLength(1));
+      expect(restored.portMappings!.single.portNumber, '1');
+      expect(restored.portMappings!.single.connectedDevice, 'PC-01');
+      expect(restored.attachments, hasLength(1));
+      expect(restored.attachments.single.name, 'صورة الجهاز');
+      expect(restored.attachments.single.dataUrl, 'data:image/png;base64,AA==');
+    });
+
+    test('Custody item preserves barcode, item code, linked device and images', () {
+      final item = CustodyCardItem(
+        id: 'item-1',
+        no: 1,
+        name: 'حاسوب محمول',
+        description: 'حاسوب الموظف',
+        unit: 'قطعة',
+        quantity: 1,
+        serialNumber: 'LAP-001',
+        barcode: '8901234567890',
+        itemCode: 'MAT-001',
+        receiptDetails: 'تسليم',
+        receiptDate: '2026-11-15',
+        returnDetails: '',
+        custodyNumber: 'C-001',
+        returnDate: '',
+        balance: 1,
+        notes: '',
+        deviceId: 'device-1',
+        imageUrls: const ['https://example.test/item.png'],
+      );
+
+      final restored = CustodyCardItem.fromMap(item.toMap());
+
+      expect(restored.barcode, item.barcode);
+      expect(restored.itemCode, item.itemCode);
+      expect(restored.deviceId, item.deviceId);
+      expect(restored.imageUrls, item.imageUrls);
+    });
+
+    test('Movement preserves scanned barcode through Supabase mapping', () {
+      final movement = Movement(
+        id: 'movement-1',
+        referenceNumber: 'MOV-001',
+        type: MovementType.handover,
+        deviceId: 'device-1',
+        deviceName: 'حاسوب محمول',
+        serialNumber: 'LAP-001',
+        barcode: '8901234567890',
+        fromEntity: 'المستودع',
+        toEntity: 'الموظف',
+        executorName: 'مسؤول العهدة',
+        date: '2026-11-15',
+        reason: 'تسليم',
+        createdAt: '2026-11-15T00:00:00Z',
+      );
+
+      final restored = Movement.fromMap(movement.toMap(), movement.id);
+
+      expect(restored.barcode, movement.barcode);
+      expect(restored.deviceId, movement.deviceId);
+      expect(restored.referenceNumber, movement.referenceNumber);
+    });
   });
 }
