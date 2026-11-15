@@ -1,5 +1,17 @@
 import com.android.build.api.dsl.ApplicationExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+val releaseSigningProperties = Properties()
+val releaseSigningPropertiesFile = rootProject.file("key.properties")
+if (releaseSigningPropertiesFile.exists()) {
+    releaseSigningPropertiesFile.inputStream().use(releaseSigningProperties::load)
+}
+val releaseStoreFile = releaseSigningProperties.getProperty("storeFile")?.let { file(it) }
+val hasReleaseSigning = releaseStoreFile?.exists() == true &&
+    listOf("storePassword", "keyPassword", "keyAlias").all {
+        !releaseSigningProperties.getProperty(it).isNullOrBlank()
+    }
 
 plugins {
     id("com.android.application")
@@ -26,11 +38,26 @@ extensions.configure<ApplicationExtension> {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasReleaseSigning) {
+                storeFile = requireNotNull(releaseStoreFile)
+                storePassword = releaseSigningProperties.getProperty("storePassword")
+                keyAlias = releaseSigningProperties.getProperty("keyAlias")
+                keyPassword = releaseSigningProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Temporary debug signing is for CI validation only.
-            // Replace with an owner-managed release keystore before publishing.
-            signingConfig = signingConfigs.getByName("debug")
+            // Owner-managed signing is used when android/key.properties and its
+            // keystore are present; debug signing remains CI-only fallback.
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }
