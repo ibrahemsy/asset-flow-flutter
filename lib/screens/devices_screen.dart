@@ -450,7 +450,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      manufacturerCtrl.dispose();
+      modelCtrl.dispose();
+      serialCtrl.dispose();
+      barcodeCtrl.dispose();
+      assetCtrl.dispose();
+      locationCtrl.dispose();
+      supplierCtrl.dispose();
+      notesCtrl.dispose();
+    });
   }
 }
 
