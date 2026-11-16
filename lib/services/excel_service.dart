@@ -89,6 +89,7 @@ class ExcelService {
     final headers = [
       'رقم البطاقة',
       'اسم الموظف',
+      'رقم الهوية',
       'الصفة الوظيفية',
       'المديرية',
       'الدائرة',
@@ -99,6 +100,11 @@ class ExcelService {
       'عدد المواد',
       'الحالة',
       'المصادقة الإدارية',
+      'تاريخ المصادقة',
+      'توقيع الموظف',
+      'توقيع مسؤول التسليم',
+      'توقيع رئيس الدائرة',
+      'توقيع أمين المستودع',
       'ملاحظات',
     ];
     for (var i = 0; i < headers.length; i++) {
@@ -111,6 +117,7 @@ class ExcelService {
       final values = [
         c.cardNumber,
         c.employeeName,
+        c.nationalId,
         c.jobTitle,
         c.directorate,
         c.department,
@@ -121,6 +128,11 @@ class ExcelService {
         c.items.length.toString(),
         c.status == 'active' ? 'نشطة' : (c.status == 'archived' ? 'مؤرشفة' : c.status),
         c.adminEndorsement,
+        c.endorsementDate,
+        c.employeeSignature,
+        c.deliveryOfficerSignature,
+        c.deptHeadSignature,
+        c.warehouseKeeperSignature,
         c.notes ?? '',
       ];
       for (var col = 0; col < values.length; col++) {
@@ -323,9 +335,10 @@ class ExcelService {
     // --- العهدة ---
     final cardSheet = excel['بطاقات العهدة'];
     final cardHeaders = [
-      'رقم البطاقة', 'اسم الموظف', 'الوظيفة', 'المديرية', 'الدائرة',
+      'رقم البطاقة', 'اسم الموظف', 'رقم الهوية', 'الوظيفة', 'المديرية', 'الدائرة',
       'الشعبة', 'المكتب', 'مركز العمل', 'تاريخ الإنشاء', 'عدد المواد',
-      'الحالة', 'المصادقة الإدارية', 'ملاحظات',
+      'الحالة', 'المصادقة الإدارية', 'تاريخ المصادقة', 'توقيع الموظف',
+      'توقيع مسؤول التسليم', 'توقيع رئيس الدائرة', 'توقيع أمين المستودع', 'ملاحظات',
     ];
     for (var i = 0; i < cardHeaders.length; i++) {
       cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -334,9 +347,11 @@ class ExcelService {
     for (var i = 0; i < cards.length; i++) {
       final c = cards[i];
       final vals = [
-        c.cardNumber, c.employeeName, c.jobTitle, c.directorate, c.department,
+        c.cardNumber, c.employeeName, c.nationalId, c.jobTitle, c.directorate, c.department,
         c.division, c.officeOrCenter, c.workCenter, c.creationDate,
-        '${c.items.length}', c.status, c.adminEndorsement, c.notes ?? '',
+        '${c.items.length}', c.status, c.adminEndorsement, c.endorsementDate,
+        c.employeeSignature, c.deliveryOfficerSignature, c.deptHeadSignature,
+        c.warehouseKeeperSignature, c.notes ?? '',
       ];
       for (var col = 0; col < vals.length; col++) {
         cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1)).value =
@@ -670,7 +685,13 @@ class ExcelService {
       final workCenterCol = findColumn(cardHeaders, ['مركز العمل', 'work center']);
       final dateCol = findColumn(cardHeaders, ['تاريخ الإنشاء', 'creationdate', 'التاريخ']);
       final statusCol = findColumn(cardHeaders, ['الحالة', 'status']);
+      final nationalIdCol = findColumn(cardHeaders, ['رقم الهوية', 'الرقم الوطني', 'nationalid']);
       final endorsementCol = findColumn(cardHeaders, ['المصادقة الإدارية', 'admin endorsement']);
+      final endorsementDateCol = findColumn(cardHeaders, ['تاريخ المصادقة', 'endorsement date']);
+      final employeeSignatureCol = findColumn(cardHeaders, ['توقيع الموظف', 'employee signature']);
+      final deliverySignatureCol = findColumn(cardHeaders, ['توقيع مسؤول التسليم', 'delivery officer signature']);
+      final deptHeadSignatureCol = findColumn(cardHeaders, ['توقيع رئيس الدائرة', 'department head signature']);
+      final warehouseSignatureCol = findColumn(cardHeaders, ['توقيع أمين المستودع', 'warehouse keeper signature']);
 
       final itemsByCard = <String, List<CustodyCardItem>>{};
       Sheet? itemsSheet = workbook.tables['تفاصيل مواد العهدة'];
@@ -694,6 +715,10 @@ class ExcelService {
         final barcodeCol = findColumn(itemHeaders, ['الباركود', 'barcode']);
         final itemCodeCol = findColumn(itemHeaders, ['رمز المادة', 'itemcode']);
         final balanceCol = findColumn(itemHeaders, ['الرصيد', 'balance']);
+        final receiptDetailsCol = findColumn(itemHeaders, ['تفاصيل الاستلام', 'receipt details']);
+        final receiptDateCol = findColumn(itemHeaders, ['تاريخ الاستلام', 'receipt date']);
+        final returnDetailsCol = findColumn(itemHeaders, ['تفاصيل الإرجاع', 'return details']);
+        final returnDateCol = findColumn(itemHeaders, ['تاريخ الإرجاع', 'return date']);
         final notesCol = findColumn(itemHeaders, ['ملاحظات', 'notes']);
 
         for (var rowIndex = 1; rowIndex < itemsSheet.maxRows; rowIndex++) {
@@ -712,11 +737,11 @@ class ExcelService {
             serialNumber: cell(row, serialCol),
             barcode: cell(row, barcodeCol),
             itemCode: cell(row, itemCodeCol),
-            receiptDetails: '',
-            receiptDate: '',
-            returnDetails: '',
+            receiptDetails: cell(row, receiptDetailsCol),
+            receiptDate: cell(row, receiptDateCol),
+            returnDetails: cell(row, returnDetailsCol),
             custodyNumber: cardNo,
-            returnDate: '',
+            returnDate: cell(row, returnDateCol),
             balance: number(cell(row, balanceCol), fallback: quantity),
             notes: cell(row, notesCol),
           );
@@ -739,6 +764,7 @@ class ExcelService {
           id: const Uuid().v4(),
           cardNumber: cardNumber,
           employeeName: employeeName.isEmpty ? 'موظف مستورد' : employeeName,
+          nationalId: cell(row, nationalIdCol),
           jobTitle: cell(row, jobCol),
           directorate: cell(row, directorateCol),
           workCenter: cell(row, workCenterCol),
@@ -749,12 +775,12 @@ class ExcelService {
               ? now.split('T').first
               : cell(row, dateCol),
           items: itemsByCard[cardNumber] ?? const [],
-          employeeSignature: '',
-          deliveryOfficerSignature: '',
-          deptHeadSignature: '',
-          warehouseKeeperSignature: '',
+          employeeSignature: cell(row, employeeSignatureCol),
+          deliveryOfficerSignature: cell(row, deliverySignatureCol),
+          deptHeadSignature: cell(row, deptHeadSignatureCol),
+          warehouseKeeperSignature: cell(row, warehouseSignatureCol),
           adminEndorsement: cell(row, endorsementCol),
-          endorsementDate: '',
+          endorsementDate: cell(row, endorsementDateCol),
           status: statusText.contains('مؤرش') || statusText.contains('archiv')
               ? 'archived'
               : (statusText.contains('pending') || statusText.contains('اعتماد')
