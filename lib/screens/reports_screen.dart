@@ -24,12 +24,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     try {
       await action();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _status = 'خطأ: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: AppTheme.danger),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ: $e'), backgroundColor: AppTheme.danger),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -91,8 +90,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     : () => _run(() async {
                           final path = await app.exportDevicesExcel();
                           setState(() => _status = path != null && !path.startsWith('خطأ') ? 'تم التصدير: $path' : path);
-                          if (mounted && path != null && !path.startsWith('خطأ')) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حفظ/مشاركة الملف')));
+                          if (!context.mounted) return;
+                          if (path != null && !path.startsWith('خطأ')) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ/مشاركة الملف')));
                           }
                         }),
               ),
@@ -118,11 +118,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     : () => _run(() async {
                           final path = await app.exportFullExcel();
                           setState(() => _status = path);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(path != null && !path.startsWith('خطأ') ? 'تم إنشاء التقرير الشامل' : path ?? 'فشل')),
-                            );
-                          }
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(path != null && !path.startsWith('خطأ') ? 'تم إنشاء التقرير الشامل' : path ?? 'فشل')),
+                          );
                         }),
               ),
 
