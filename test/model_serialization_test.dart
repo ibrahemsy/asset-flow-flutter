@@ -196,6 +196,54 @@ void main() {
     });
   });
 
+  test('Excel custody import restores detail-sheet items and barcodes', () {
+    final workbook = Excel.createExcel();
+    final cards = workbook['بطاقات العهدة'];
+    workbook.delete('Sheet1');
+    final cardHeaders = [
+      'رقم البطاقة', 'اسم الموظف', 'الصفة الوظيفية', 'المديرية', 'الدائرة',
+      'الشعبة', 'المكتب', 'مركز العمل', 'تاريخ الإنشاء', 'عدد المواد',
+      'الحالة', 'المصادقة الإدارية',
+    ];
+    final cardValues = [
+      'C-100', 'موظف تجريبي', 'مهندس', 'المديرية العامة', 'الاتصالات',
+      'الشبكات', 'مكتب 1', 'دمشق', '2026-11-16', '1', 'نشطة', 'مصادق',
+    ];
+    for (var i = 0; i < cardHeaders.length; i++) {
+      cards.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(cardHeaders[i]);
+      cards.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1)).value = TextCellValue(cardValues[i]);
+    }
+
+    final details = workbook['تفاصيل مواد العهدة'];
+    final itemHeaders = [
+      'رقم البطاقة', 'اسم الموظف', 'م', 'اسم المادة', 'الوصف', 'الوحدة',
+      'الكمية', 'الرقم التسلسلي', 'الباركود', 'رمز المادة', 'الرصيد', 'ملاحظات',
+    ];
+    final itemValues = [
+      'C-100', 'موظف تجريبي', '1', 'حاسوب محمول', 'حاسوب العمل', 'قطعة',
+      '1', 'SN-100', 'BC-100', 'IT-100', '1', 'سليم',
+    ];
+    for (var i = 0; i < itemHeaders.length; i++) {
+      details.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(itemHeaders[i]);
+      details.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1)).value = TextCellValue(itemValues[i]);
+    }
+
+    final bytes = workbook.encode();
+    expect(bytes, isNotNull);
+    final result = ExcelService().importCustodyCardsFromBytes(Uint8List.fromList(bytes!));
+
+    expect(result.success, isTrue);
+    expect(result.items, hasLength(1));
+    final card = result.items.single;
+    expect(card.directorate, 'المديرية العامة');
+    expect(card.workCenter, 'دمشق');
+    expect(card.items, hasLength(1));
+    expect(card.items.single.name, 'حاسوب محمول');
+    expect(card.items.single.barcode, 'BC-100');
+    expect(card.items.single.itemCode, 'IT-100');
+    expect(card.items.single.balance, 1);
+  });
+
   test('Excel device import preserves barcode, asset number and hardware specifications', () {
     final workbook = Excel.createExcel();
     final sheet = workbook['سجل الأجهزة'];
