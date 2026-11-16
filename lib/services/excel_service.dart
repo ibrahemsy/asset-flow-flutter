@@ -121,7 +121,7 @@ class ExcelService {
         c.items.length.toString(),
         c.status == 'active' ? 'نشطة' : (c.status == 'archived' ? 'مؤرشفة' : c.status),
         c.adminEndorsement,
-        c.notes,
+        c.notes ?? '',
       ];
       for (var col = 0; col < values.length; col++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value =
@@ -336,7 +336,7 @@ class ExcelService {
       final vals = [
         c.cardNumber, c.employeeName, c.jobTitle, c.directorate, c.department,
         c.division, c.officeOrCenter, c.workCenter, c.creationDate,
-        '${c.items.length}', c.status, c.adminEndorsement, c.notes,
+        '${c.items.length}', c.status, c.adminEndorsement, c.notes ?? '',
       ];
       for (var col = 0; col < vals.length; col++) {
         cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1)).value =
