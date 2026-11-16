@@ -162,15 +162,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ? null
                     : () => _run(() async {
                           final res = await app.importDevicesExcel();
-                          setState(() => _status = res.message);
-                          if (res.success && res.items.isNotEmpty) {
-                            for (final d in res.items) {
-                              await app.saveDevice(d);
-                            }
-                          }
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message)));
-                          }
+                          final result = res.success && res.items.isNotEmpty
+                              ? await app.importDevices(res.items)
+                              : res.message;
+                          if (!mounted) return;
+                          setState(() => _status = '${res.message}\n$result');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(result)),
+                          );
                         }),
               ),
               _ActionTile(
@@ -182,15 +181,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ? null
                     : () => _run(() async {
                           final res = await app.importCustodyExcel();
-                          setState(() => _status = res.message);
-                          if (res.success && res.items.isNotEmpty) {
-                            for (final c in res.items) {
-                              await app.saveCustodyCard(c);
-                            }
-                          }
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res.message)));
-                          }
+                          final result = res.success && res.items.isNotEmpty
+                              ? await app.importCustodyCards(res.items)
+                              : res.message;
+                          if (!mounted) return;
+                          setState(() => _status = '${res.message}\n$result');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(result)),
+                          );
                         }),
               ),
 
