@@ -201,13 +201,15 @@ void main() {
     final cards = workbook['بطاقات العهدة'];
     workbook.delete('Sheet1');
     final cardHeaders = [
-      'رقم البطاقة', 'اسم الموظف', 'الصفة الوظيفية', 'المديرية', 'الدائرة',
+      'رقم البطاقة', 'اسم الموظف', 'رقم الهوية', 'الصفة الوظيفية', 'المديرية', 'الدائرة',
       'الشعبة', 'المكتب', 'مركز العمل', 'تاريخ الإنشاء', 'عدد المواد',
-      'الحالة', 'المصادقة الإدارية',
+      'الحالة', 'المصادقة الإدارية', 'تاريخ المصادقة', 'توقيع الموظف',
+      'توقيع مسؤول التسليم', 'توقيع رئيس الدائرة', 'توقيع أمين المستودع',
     ];
     final cardValues = [
-      'C-100', 'موظف تجريبي', 'مهندس', 'المديرية العامة', 'الاتصالات',
+      'C-100', 'موظف تجريبي', '12345678901', 'مهندس', 'المديرية العامة', 'الاتصالات',
       'الشبكات', 'مكتب 1', 'دمشق', '2026-11-16', '1', 'نشطة', 'مصادق',
+      '2026-11-17', 'توقيع الموظف', 'توقيع مسؤول التسليم', 'توقيع رئيس الدائرة', 'توقيع أمين المستودع',
     ];
     for (var i = 0; i < cardHeaders.length; i++) {
       cards.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(cardHeaders[i]);
@@ -217,11 +219,13 @@ void main() {
     final details = workbook['تفاصيل مواد العهدة'];
     final itemHeaders = [
       'رقم البطاقة', 'اسم الموظف', 'م', 'اسم المادة', 'الوصف', 'الوحدة',
-      'الكمية', 'الرقم التسلسلي', 'الباركود', 'رمز المادة', 'الرصيد', 'ملاحظات',
+      'الكمية', 'الرقم التسلسلي', 'الباركود', 'رمز المادة', 'الرصيد',
+      'تفاصيل الاستلام', 'تاريخ الاستلام', 'تفاصيل الإرجاع', 'تاريخ الإرجاع', 'ملاحظات',
     ];
     final itemValues = [
       'C-100', 'موظف تجريبي', '1', 'حاسوب محمول', 'حاسوب العمل', 'قطعة',
-      '1', 'SN-100', 'BC-100', 'IT-100', '1', 'سليم',
+      '1', 'SN-100', 'BC-100', 'IT-100', '1',
+      'استلام كامل', '2026-11-16', 'إرجاع جزئي', '2026-11-18', 'سليم',
     ];
     for (var i = 0; i < itemHeaders.length; i++) {
       details.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(itemHeaders[i]);
@@ -237,10 +241,20 @@ void main() {
     final card = result.items.single;
     expect(card.directorate, 'المديرية العامة');
     expect(card.workCenter, 'دمشق');
+    expect(card.nationalId, '12345678901');
+    expect(card.endorsementDate, '2026-11-17');
+    expect(card.employeeSignature, 'توقيع الموظف');
+    expect(card.deliveryOfficerSignature, 'توقيع مسؤول التسليم');
+    expect(card.deptHeadSignature, 'توقيع رئيس الدائرة');
+    expect(card.warehouseKeeperSignature, 'توقيع أمين المستودع');
     expect(card.items, hasLength(1));
     expect(card.items.single.name, 'حاسوب محمول');
     expect(card.items.single.barcode, 'BC-100');
     expect(card.items.single.itemCode, 'IT-100');
+    expect(card.items.single.receiptDetails, 'استلام كامل');
+    expect(card.items.single.receiptDate, '2026-11-16');
+    expect(card.items.single.returnDetails, 'إرجاع جزئي');
+    expect(card.items.single.returnDate, '2026-11-18');
     expect(card.items.single.balance, 1);
   });
 
