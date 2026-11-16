@@ -186,6 +186,7 @@ class ExcelService {
       'نوع الحركة',
       'اسم الجهاز',
       'الرقم التسلسلي',
+      'الباركود',
       'من',
       'إلى',
       'المنفذ',
@@ -204,6 +205,7 @@ class ExcelService {
         m.type.labelAr,
         m.deviceName,
         m.serialNumber,
+        m.barcode ?? '',
         m.fromEntity,
         m.toEntity,
         m.executorName,
@@ -467,6 +469,10 @@ class ExcelService {
       final statusCol = col(['حالة التواجد', 'status', 'الحالة']);
       final supplierCol = col(['المورد', 'supplier']);
       final purchaseCol = col(['تاريخ الشراء', 'تاريخ التوريد', 'purchase', 'purchasedate']);
+      final cpuCol = col(['المعالج cpu', 'المعالج', 'cpu', 'processor']);
+      final ramCol = col(['الذاكرة ram', 'الذاكرة', 'ram', 'memory']);
+      final storageCol = col(['التخزين storage', 'التخزين', 'storage', 'disk']);
+      final deliveryCol = col(['تاريخ التسليم', 'delivery date', 'deliverydate']);
 
       if (nameCol == null && serialCol == null) {
         return ImportResult(
@@ -507,6 +513,10 @@ class ExcelService {
           assetNumber: assetCol != null ? _cellStr(row.length > assetCol ? row[assetCol] : null) : '',
           purchaseDate: purchaseCol != null ? _cellStr(row.length > purchaseCol ? row[purchaseCol] : null) : now.split('T').first,
           supplier: supplierCol != null ? _cellStr(row.length > supplierCol ? row[supplierCol] : null) : '',
+          cpu: cpuCol != null ? _cellStr(row.length > cpuCol ? row[cpuCol] : null) : null,
+          ram: ramCol != null ? _cellStr(row.length > ramCol ? row[ramCol] : null) : null,
+          storage: storageCol != null ? _cellStr(row.length > storageCol ? row[storageCol] : null) : null,
+          deliveryDate: deliveryCol != null ? _cellStr(row.length > deliveryCol ? row[deliveryCol] : null) : null,
           condition: _parseCondition(conditionStr),
           status: _parseStatus(statusStr),
           location: locationCol != null ? _cellStr(row.length > locationCol ? row[locationCol] : null) : '',
