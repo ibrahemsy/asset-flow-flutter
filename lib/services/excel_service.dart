@@ -617,11 +617,15 @@ class ExcelService {
       final endorsementCol = findColumn(cardHeaders, ['المصادقة الإدارية', 'admin endorsement']);
 
       final itemsByCard = <String, List<CustodyCardItem>>{};
-      final itemsSheet = workbook.tables['تفاصيل مواد العهدة'] ??
-          workbook.tables.entries
-              .where((entry) => entry.key.contains('تفاصيل'))
-              .map((entry) => entry.value)
-              .firstOrNull;
+      Sheet? itemsSheet = workbook.tables['تفاصيل مواد العهدة'];
+      if (itemsSheet == null) {
+        for (final entry in workbook.tables.entries) {
+          if (entry.key.contains('تفاصيل')) {
+            itemsSheet = entry.value;
+            break;
+          }
+        }
+      }
       if (itemsSheet != null && itemsSheet.maxRows > 1) {
         final itemHeaders = headersOf(itemsSheet);
         final itemCardCol = findColumn(itemHeaders, ['رقم البطاقة', 'cardnumber']);
@@ -644,7 +648,7 @@ class ExcelService {
           final quantity = number(cell(row, quantityCol), fallback: 1);
           final item = CustodyCardItem(
             id: const Uuid().v4(),
-            no: number(cell(row, itemNoCol), fallback: itemsByCard[cardNo]?.length ?? 0 + 1),
+            no: number(cell(row, itemNoCol), fallback: (itemsByCard[cardNo]?.length ?? 0) + 1),
             name: itemName,
             description: cell(row, descriptionCol),
             unit: cell(row, unitCol),
@@ -697,7 +701,9 @@ class ExcelService {
           endorsementDate: '',
           status: statusText.contains('مؤرش') || statusText.contains('archiv')
               ? 'archived'
-              : 'active',
+              : (statusText.contains('pending') || statusText.contains('اعتماد')
+                  ? 'pending'
+                  : 'active'),
           createdAt: now,
           updatedAt: now,
         ));
