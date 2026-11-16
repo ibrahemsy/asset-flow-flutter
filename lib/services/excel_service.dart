@@ -252,17 +252,20 @@ class ExcelService {
 
     final headers = [
       'رقم البلاغ',
+      'معرّف الجهاز',
       'اسم الجهاز',
       'الرقم التسلسلي',
+      'الباركود',
       'وصف العطل',
       'القسم / المكتب',
       'تاريخ البلاغ',
       'الأولوية',
       'الفني المكلف',
-      'الإجراءات',
+      'الإجراءات المتخذة',
       'قطع الغيار',
       'تاريخ الإصلاح',
       'الحالة',
+      'تاريخ الإنشاء',
     ];
     for (var i = 0; i < headers.length; i++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
@@ -272,8 +275,10 @@ class ExcelService {
       final t = tickets[i];
       final values = [
         t.ticketNumber,
+        t.deviceId ?? '',
         t.deviceName,
         t.serialNumber ?? '',
+        t.barcode ?? '',
         t.faultDescription,
         t.stationOrDept,
         t.reportDate,
@@ -283,6 +288,7 @@ class ExcelService {
         t.sparePartsUsed,
         t.resolutionDate ?? '',
         t.status.labelAr,
+        t.createdAt,
       ];
       for (var c = 0; c < values.length; c++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
