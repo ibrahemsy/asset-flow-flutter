@@ -391,14 +391,23 @@ class ExcelService {
 
     // --- الصيانة ---
     final tktSheet = excel['الصيانة'];
-    final tktHeaders = ['رقم البلاغ', 'الجهاز', 'العطل', 'الأولوية', 'الحالة', 'التاريخ'];
+    final tktHeaders = [
+      'رقم البلاغ', 'معرّف الجهاز', 'الجهاز', 'الرقم التسلسلي', 'الباركود',
+      'وصف العطل', 'القسم / المكتب', 'تاريخ البلاغ', 'الأولوية', 'الفني المكلف',
+      'الإجراءات المتخذة', 'قطع الغيار', 'تاريخ الإصلاح', 'الحالة', 'تاريخ الإنشاء',
+    ];
     for (var i = 0; i < tktHeaders.length; i++) {
       tktSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(tktHeaders[i]);
     }
     for (var i = 0; i < tickets.length; i++) {
       final t = tickets[i];
-      final vals = [t.ticketNumber, t.deviceName, t.faultDescription, t.priority.labelAr, t.status.labelAr, t.reportDate];
+      final vals = [
+        t.ticketNumber, t.deviceId ?? '', t.deviceName, t.serialNumber ?? '',
+        t.barcode ?? '', t.faultDescription, t.stationOrDept, t.reportDate,
+        t.priority.labelAr, t.assignedTech, t.actionsTaken, t.sparePartsUsed,
+        t.resolutionDate ?? '', t.status.labelAr, t.createdAt,
+      ];
       for (var c = 0; c < vals.length; c++) {
         tktSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -407,14 +416,15 @@ class ExcelService {
 
     // --- الهواتف ---
     final phoneSheet = excel['دليل الهواتف'];
-    final phoneHeaders = ['الرقم', 'الموظف', 'القسم', 'المكتب', 'منفذ PBX', 'الحالة'];
+    final phoneHeaders = ['الرقم', 'الموظف', 'القسم', 'المكتب', 'منفذ PBX', 'رقم النقطة', 'الحالة', 'ملاحظات'];
     for (var i = 0; i < phoneHeaders.length; i++) {
       phoneSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(phoneHeaders[i]);
     }
     for (var i = 0; i < phones.length; i++) {
       final p = phones[i];
-      final vals = [p.phoneNumber, p.employeeName, p.department, p.officeLocation, p.pbxPortNumber, p.status];
+      final vals = [p.phoneNumber, p.employeeName, p.department, p.officeLocation,
+        p.pbxPortNumber, p.pointNumber ?? '', p.status, p.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         phoneSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -423,14 +433,15 @@ class ExcelService {
 
     // --- الشبكات ---
     final netSheet = excel['الشبكات'];
-    final netHeaders = ['الاسم', 'النوع', 'نطاق IP', 'البوابة', 'الموقع', 'الحالة'];
+    final netHeaders = ['الاسم', 'النوع', 'نطاق IP', 'البوابة', 'عرض النطاق', 'التردد', 'الموقع', 'الحالة', 'ملاحظات'];
     for (var i = 0; i < netHeaders.length; i++) {
       netSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(netHeaders[i]);
     }
     for (var i = 0; i < networks.length; i++) {
       final n = networks[i];
-      final vals = [n.name, n.type, n.ipRange ?? '', n.gateway ?? '', n.location, n.status];
+      final vals = [n.name, n.type, n.ipRange ?? '', n.gateway ?? '', n.bandwidth ?? '',
+        n.frequency ?? '', n.location, n.status, n.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         netSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
