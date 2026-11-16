@@ -89,3 +89,22 @@ flutter build apk --release
 
 ### توقيع iOS
 بناء iOS الموجود في CI غير موقع (no-codesign) ولا يمكن تثبيته أو توزيعه كنسخة إنتاجية قبل إعداد Apple Developer signing. يتطلب ذلك حساب Apple Developer، وApple Distribution certificate، وProvisioning Profile، وTeam ID، ثم إعداد أسرار GitHub Actions المناسبة. لا ترفع ملفات الشهادة أو كلمات مرورها إلى Git.
+
+## نتيجة بناء التحقق الأخيرة (16 نوفمبر 2026)
+
+تم التحقق من commit `3fa8e76e091ffdf9263d19330d6ecd837ba6320b` عبر [GitHub Actions run #249](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43775661458)، وكانت المهام التالية ناجحة:
+- Flutter static analysis وUnit/Widget tests.
+- Web release build.
+- Android APK وAndroid App Bundle.
+- iOS unsigned app build ورفع مشروع iOS الناتج.
+
+أسماء مخرجات التشغيل:
+- `asset-flow-web`
+- `asset-flow-android-apk-testing-only`
+- `asset-flow-android-aab-testing-only`
+- `asset-flow-ios-unsigned-app`
+- `asset-flow-ios-project`
+
+**تنبيه توقيع موثق:** لم تكن أسرار توقيع المالك مضافة إلى هذا التشغيل؛ لذلك صنّف CI مخرجات Android صراحةً على أنها `testing-only`. كما أن iOS مخرج غير موقّع. نجاح البناء والاختبارات لا يعني أن التطبيق اجتاز اختبار أجهزة فعلية أو أصبح جاهزاً للنشر في المتاجر. لا تستخدم هذه الملفات كإصدار إنتاجي.
+
+مخرجات GitHub Actions محفوظة وفق مدة الاحتفاظ الافتراضية للـ artifacts، وقد تنتهي صلاحية روابط التنزيل؛ أنشئ إصداراً جديداً عند الحاجة إلى ملفات حديثة.
