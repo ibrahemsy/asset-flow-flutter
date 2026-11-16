@@ -93,7 +93,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Android APK (production-signed)
-        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: asset-flow-android-apk-production-signed
@@ -109,7 +109,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Android App Bundle (production-signed)
-        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: asset-flow-android-aab-production-signed
@@ -117,7 +117,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Android App Bundle (testing only)
-        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_STORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: asset-flow-android-aab-testing-only
