@@ -236,6 +236,52 @@ class AppProvider extends ChangeNotifier {
   Future<ImportResult<Device>> importDevicesExcel() => _excel.importDevicesFromFile();
   Future<ImportResult<CustodyCard>> importCustodyExcel() => _excel.importCustodyCardsFromFile();
 
+  /// Imports records one by one, reports partial failures, and refreshes once.
+  /// Non-admin users create approval requests rather than writing operational rows.
+  Future<String> importDevices(List<Device> items) =>
+      _importRecords<Device>(items, _supabase.saveDevice);
+
+  Future<String> importCustodyCards(List<CustodyCard> items) =>
+      _importRecords<CustodyCard>(items, _supabase.saveCustodyCard);
+
+  Future<String> _importRecords<T>(
+    List<T> items,
+    Future<void> Function(T item) save,
+  ) async {
+    if (currentUser == null) return 'يجب تسجيل الدخول قبل الاستيراد.';
+    if (items.isEmpty) return 'لا توجد سجلات صالحة للاستيراد.';
+    if (isSyncing) return 'هناك عملية أخرى قيد التنفيذ؛ حاول بعد انتهائها.';
+
+    final wasAdmin = _isAdmin;
+    var succeeded = 0;
+    final failures = <String>[];
+    isSyncing = true;
+    notifyListeners();
+    try {
+      for (var i = 0; i < items.length; i++) {
+        try {
+          await save(items[i]);
+          succeeded++;
+        } catch (e) {
+          failures.add('السجل ${i + 1}: $e');
+        }
+      }
+      if (succeeded > 0) {
+        await _loadSettingsAndData();
+      }
+      final result = wasAdmin
+          ? 'تم حفظ $succeeded من أصل ${items.length} سجل.'
+          : 'تم إرسال $succeeded من أصل ${items.length} طلباً للاعتماد؛ لم تُضف السجلات مباشرة.';
+      if (failures.isEmpty) return result;
+      final details = failures.take(3).join('؛ ');
+      final remaining = failures.length > 3 ? '؛ وأخطاء أخرى (${failures.length - 3})' : '';
+      return '$result فشل ${failures.length}. $details$remaining';
+    } finally {
+      isSyncing = false;
+      notifyListeners();
+    }
+  }
+
   Future<SheetsExportResult> exportToGoogleSheets() => _sheets.exportInventoryToGoogleSheets(
     title: 'جرد الأصول والعهدة - دائرة الاتصالات',
     devices: devices,
