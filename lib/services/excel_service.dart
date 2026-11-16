@@ -335,7 +335,7 @@ class ExcelService {
     }
     for (var i = 0; i < movements.length; i++) {
       final m = movements[i];
-      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.serialNumber, m.barcode, m.fromEntity, m.toEntity, m.executorName, m.date, m.reason, m.notes ?? ''];
+      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.serialNumber, m.barcode ?? '', m.fromEntity, m.toEntity, m.executorName, m.date, m.reason, m.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         movSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
