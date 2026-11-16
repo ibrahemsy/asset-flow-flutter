@@ -287,7 +287,9 @@ class ExcelService {
     final devSheet = excel['الأجهزة'];
     final devHeaders = [
       'م', 'اسم الجهاز', 'التصنيف', 'الشركة', 'الطراز', 'الرقم التسلسلي',
-      'الباركود', 'رقم العهدة', 'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'ملاحظات',
+      'الباركود', 'رقم العهدة', 'المعالج CPU', 'الذاكرة RAM', 'التخزين Storage',
+      'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'تاريخ الشراء',
+      'المورد', 'تاريخ التسليم', 'ملاحظات',
     ];
     for (var i = 0; i < devHeaders.length; i++) {
       devSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -297,8 +299,10 @@ class ExcelService {
       final d = devices[i];
       final vals = [
         '${i + 1}', d.name, d.category.labelAr, d.manufacturer, d.model,
-        d.serialNumber, d.barcode, d.assetNumber, d.condition.labelAr, d.status.labelAr,
-        d.location, d.assignedEmployee ?? '', d.notes ?? '',
+        d.serialNumber, d.barcode, d.assetNumber, d.cpu ?? '', d.ram ?? '',
+        d.storage ?? '', d.condition.labelAr, d.status.labelAr, d.location,
+        d.assignedEmployee ?? '', d.purchaseDate, d.supplier, d.deliveryDate ?? '',
+        d.notes ?? '',
       ];
       for (var c = 0; c < vals.length; c++) {
         devSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
@@ -325,6 +329,35 @@ class ExcelService {
       for (var col = 0; col < vals.length; col++) {
         cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1)).value =
             TextCellValue(vals[col]);
+      }
+    }
+
+    // --- تفاصيل مواد العهدة ---
+    final cardItemsSheet = excel['تفاصيل مواد العهدة'];
+    final cardItemHeaders = [
+      'رقم البطاقة', 'اسم الموظف', 'م', 'اسم المادة', 'الوصف', 'الوحدة',
+      'الكمية', 'الرقم التسلسلي', 'الباركود', 'رمز المادة', 'الرصيد',
+      'تفاصيل الاستلام', 'تاريخ الاستلام', 'تفاصيل الإرجاع', 'تاريخ الإرجاع',
+      'ملاحظات',
+    ];
+    for (var i = 0; i < cardItemHeaders.length; i++) {
+      cardItemsSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
+          TextCellValue(cardItemHeaders[i]);
+    }
+    var cardItemRow = 1;
+    for (final card in cards) {
+      for (final item in card.items) {
+        final values = [
+          card.cardNumber, card.employeeName, item.no.toString(), item.name,
+          item.description, item.unit, item.quantity.toString(), item.serialNumber,
+          item.barcode, item.itemCode, item.balance.toString(), item.receiptDetails,
+          item.receiptDate, item.returnDetails, item.returnDate, item.notes,
+        ];
+        for (var col = 0; col < values.length; col++) {
+          cardItemsSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: cardItemRow)).value =
+              TextCellValue(values[col]);
+        }
+        cardItemRow++;
       }
     }
 
