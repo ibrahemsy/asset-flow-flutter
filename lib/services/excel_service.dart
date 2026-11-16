@@ -323,8 +323,9 @@ class ExcelService {
     // --- العهدة ---
     final cardSheet = excel['بطاقات العهدة'];
     final cardHeaders = [
-      'رقم البطاقة', 'اسم الموظف', 'الوظيفة', 'الدائرة', 'الشعبة',
-      'تاريخ الإنشاء', 'عدد المواد', 'الحالة',
+      'رقم البطاقة', 'اسم الموظف', 'الوظيفة', 'المديرية', 'الدائرة',
+      'الشعبة', 'المكتب', 'مركز العمل', 'تاريخ الإنشاء', 'عدد المواد',
+      'الحالة', 'المصادقة الإدارية', 'ملاحظات',
     ];
     for (var i = 0; i < cardHeaders.length; i++) {
       cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -333,8 +334,9 @@ class ExcelService {
     for (var i = 0; i < cards.length; i++) {
       final c = cards[i];
       final vals = [
-        c.cardNumber, c.employeeName, c.jobTitle, c.department, c.division,
-        c.creationDate, '${c.items.length}', c.status,
+        c.cardNumber, c.employeeName, c.jobTitle, c.directorate, c.department,
+        c.division, c.officeOrCenter, c.workCenter, c.creationDate,
+        '${c.items.length}', c.status, c.adminEndorsement, c.notes,
       ];
       for (var col = 0; col < vals.length; col++) {
         cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1)).value =
