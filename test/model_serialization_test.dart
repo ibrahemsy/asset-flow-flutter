@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
+import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:asset_flow_flutter/services/excel_service.dart';
 import 'package:asset_flow_flutter/models/models.dart';
 
 void main() {
@@ -190,5 +194,38 @@ void main() {
       expect(restored.deviceId, movement.deviceId);
       expect(restored.referenceNumber, movement.referenceNumber);
     });
+  });
+
+  test('Excel device import preserves barcode, asset number and hardware specifications', () {
+    final workbook = Excel.createExcel();
+    final sheet = workbook['سجل الأجهزة'];
+    workbook.delete('Sheet1');
+    final headers = [
+      'اسم الجهاز', 'التصنيف', 'الشركة المصنعة', 'الطراز', 'الرقم التسلسلي',
+      'الباركود', 'رقم العهدة / المالي', 'المعالج CPU', 'الذاكرة RAM',
+      'التخزين Storage', 'تاريخ التسليم',
+    ];
+    final values = [
+      'حاسوب تجريبي', 'محمول', 'Lenovo', 'ThinkPad', 'SN-001',
+      'BC-001', 'AST-001', 'Core i7', '16 GB', '512 GB SSD', '2026-11-16',
+    ];
+    for (var i = 0; i < headers.length; i++) {
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 1)).value = TextCellValue(values[i]);
+    }
+
+    final bytes = workbook.encode();
+    expect(bytes, isNotNull);
+    final result = ExcelService().importDevicesFromBytes(Uint8List.fromList(bytes!));
+
+    expect(result.success, isTrue);
+    expect(result.items, hasLength(1));
+    final device = result.items.single;
+    expect(device.barcode, 'BC-001');
+    expect(device.assetNumber, 'AST-001');
+    expect(device.cpu, 'Core i7');
+    expect(device.ram, '16 GB');
+    expect(device.storage, '512 GB SSD');
+    expect(device.deliveryDate, '2026-11-16');
   });
 }
