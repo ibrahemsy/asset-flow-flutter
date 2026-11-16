@@ -53,6 +53,14 @@ jobs:
       - name: Resolve locked dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Verify Supabase-only application source
+        run: |
+          if grep -R -n -E "firebase_core|firebase_auth|cloud_firestore|firebase_storage|firebase_messaging|firebase_options|firebase_service" lib pubspec.yaml; then
+            echo "Firebase references found in application source or direct dependencies."
+            exit 1
+          fi
+          echo "No Firebase SDK references or direct Firebase dependencies found."
+
       - name: Static analysis
         run: flutter analyze --no-pub --no-fatal-infos
 
