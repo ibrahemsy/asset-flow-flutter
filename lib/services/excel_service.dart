@@ -556,83 +556,164 @@ class ExcelService {
     if (bytes == null) {
       return ImportResult(success: false, message: 'تعذر قراءة الملف', items: []);
     }
+    return importCustodyCardsFromBytes(bytes);
+  }
 
+  /// استيراد بطاقات العهدة وموادها من ورقتي التصدير معاً.
+  ImportResult<CustodyCard> importCustodyCardsFromBytes(Uint8List bytes) {
     try {
-      final excel = Excel.decodeBytes(bytes);
-      if (excel.tables.isEmpty) {
+      final workbook = Excel.decodeBytes(bytes);
+      if (workbook.tables.isEmpty) {
         return ImportResult(success: false, message: 'الملف فارغ أو غير صالح', items: []);
       }
-      final sheet = excel.tables.values.first;
-      if (sheet.maxRows < 2) {
-        return ImportResult(success: false, message: 'لا توجد بيانات', items: []);
+
+      final cardSheet = workbook.tables['بطاقات العهدة'] ?? workbook.tables.values.first;
+      if (cardSheet.maxRows < 2) {
+        return ImportResult(success: false, message: 'لا توجد بيانات بطاقات عهدة', items: []);
       }
 
-      final headerRow = sheet.rows.first;
-      final headerMap = <String, int>{};
-      for (var i = 0; i < headerRow.length; i++) {
-        final val = _cellStr(headerRow[i]).trim().toLowerCase();
-        if (val.isNotEmpty) headerMap[val] = i;
-      }
-
-      int? col(List<String> names) {
-        for (final n in names) {
-          if (headerMap.containsKey(n.toLowerCase())) return headerMap[n.toLowerCase()];
+      Map<String, int> headersOf(Sheet sheet) {
+        final result = <String, int>{};
+        final headerRow = sheet.rows.first;
+        for (var i = 0; i < headerRow.length; i++) {
+          final value = _cellStr(headerRow[i]).trim().toLowerCase();
+          if (value.isNotEmpty) result[value] = i;
         }
-        for (final entry in headerMap.entries) {
-          for (final n in names) {
-            if (entry.key.contains(n.toLowerCase())) return entry.value;
+        return result;
+      }
+
+      int? findColumn(Map<String, int> headers, List<String> names) {
+        for (final name in names) {
+          final index = headers[name.toLowerCase()];
+          if (index != null) return index;
+        }
+        for (final entry in headers.entries) {
+          for (final name in names) {
+            final normalized = name.toLowerCase();
+            if (entry.key.length >= 3 && entry.key.contains(normalized)) {
+              return entry.value;
+            }
           }
         }
         return null;
       }
 
-      final cardNoCol = col(['رقم البطاقة', 'cardnumber', 'البطاقة']);
-      final nameCol = col(['اسم الموظف', 'الاسم', 'employee', 'الاسم الثلاثي']);
-      final jobCol = col(['الصفة الوظيفية', 'الوظيفة', 'jobtitle', 'الوظيفة']);
-      final deptCol = col(['الدائرة', 'department']);
-      final divisionCol = col(['الشعبة', 'division']);
-      final dateCol = col(['تاريخ الإنشاء', 'التاريخ', 'creationdate', 'date']);
+      String cell(List<Data?> row, int? index) =>
+          index == null || index >= row.length ? '' : _cellStr(row[index]).trim();
+      int number(String value, {int fallback = 0}) =>
+          int.tryParse(value.replaceAll(',', '').trim()) ?? fallback;
 
-      final cards = <CustodyCard>[];
+      final cardHeaders = headersOf(cardSheet);
+      final cardNoCol = findColumn(cardHeaders, ['رقم البطاقة', 'cardnumber']);
+      final nameCol = findColumn(cardHeaders, ['اسم الموظف', 'employee name', 'الاسم']);
+      final jobCol = findColumn(cardHeaders, ['الصفة الوظيفية', 'الوظيفة', 'jobtitle']);
+      final directorateCol = findColumn(cardHeaders, ['المديرية', 'directorate']);
+      final deptCol = findColumn(cardHeaders, ['الدائرة', 'department']);
+      final divisionCol = findColumn(cardHeaders, ['الشعبة', 'division']);
+      final officeCol = findColumn(cardHeaders, ['المكتب', 'office']);
+      final workCenterCol = findColumn(cardHeaders, ['مركز العمل', 'work center']);
+      final dateCol = findColumn(cardHeaders, ['تاريخ الإنشاء', 'creationdate', 'التاريخ']);
+      final statusCol = findColumn(cardHeaders, ['الحالة', 'status']);
+      final endorsementCol = findColumn(cardHeaders, ['المصادقة الإدارية', 'admin endorsement']);
+
+      final itemsByCard = <String, List<CustodyCardItem>>{};
+      final itemsSheet = workbook.tables['تفاصيل مواد العهدة'] ??
+          workbook.tables.entries
+              .where((entry) => entry.key.contains('تفاصيل'))
+              .map((entry) => entry.value)
+              .firstOrNull;
+      if (itemsSheet != null && itemsSheet.maxRows > 1) {
+        final itemHeaders = headersOf(itemsSheet);
+        final itemCardCol = findColumn(itemHeaders, ['رقم البطاقة', 'cardnumber']);
+        final itemNoCol = findColumn(itemHeaders, ['م', 'رقم المادة', 'no']);
+        final itemNameCol = findColumn(itemHeaders, ['اسم المادة', 'المادة', 'name']);
+        final descriptionCol = findColumn(itemHeaders, ['الوصف', 'description']);
+        final unitCol = findColumn(itemHeaders, ['الوحدة', 'unit']);
+        final quantityCol = findColumn(itemHeaders, ['الكمية', 'quantity']);
+        final serialCol = findColumn(itemHeaders, ['الرقم التسلسلي', 'serial']);
+        final barcodeCol = findColumn(itemHeaders, ['الباركود', 'barcode']);
+        final itemCodeCol = findColumn(itemHeaders, ['رمز المادة', 'itemcode']);
+        final balanceCol = findColumn(itemHeaders, ['الرصيد', 'balance']);
+        final notesCol = findColumn(itemHeaders, ['ملاحظات', 'notes']);
+
+        for (var rowIndex = 1; rowIndex < itemsSheet.maxRows; rowIndex++) {
+          final row = itemsSheet.rows[rowIndex];
+          final cardNo = cell(row, itemCardCol);
+          final itemName = cell(row, itemNameCol);
+          if (cardNo.isEmpty || itemName.isEmpty) continue;
+          final quantity = number(cell(row, quantityCol), fallback: 1);
+          final item = CustodyCardItem(
+            id: const Uuid().v4(),
+            no: number(cell(row, itemNoCol), fallback: itemsByCard[cardNo]?.length ?? 0 + 1),
+            name: itemName,
+            description: cell(row, descriptionCol),
+            unit: cell(row, unitCol),
+            quantity: quantity,
+            serialNumber: cell(row, serialCol),
+            barcode: cell(row, barcodeCol),
+            itemCode: cell(row, itemCodeCol),
+            receiptDetails: '',
+            receiptDate: '',
+            returnDetails: '',
+            custodyNumber: cardNo,
+            returnDate: '',
+            balance: number(cell(row, balanceCol), fallback: quantity),
+            notes: cell(row, notesCol),
+          );
+          itemsByCard.putIfAbsent(cardNo, () => []).add(item);
+        }
+      }
+
       final now = DateTime.now().toIso8601String();
-
-      for (var r = 1; r < sheet.maxRows; r++) {
-        final row = sheet.rows[r];
-        final cardNo = cardNoCol != null ? _cellStr(row.length > cardNoCol ? row[cardNoCol] : null) : '';
-        final empName = nameCol != null ? _cellStr(row.length > nameCol ? row[nameCol] : null) : '';
-        if (cardNo.isEmpty && empName.isEmpty) continue;
-
+      final cards = <CustodyCard>[];
+      for (var rowIndex = 1; rowIndex < cardSheet.maxRows; rowIndex++) {
+        final row = cardSheet.rows[rowIndex];
+        final cardNo = cell(row, cardNoCol);
+        final employeeName = cell(row, nameCol);
+        if (cardNo.isEmpty && employeeName.isEmpty) continue;
+        final statusText = cell(row, statusCol).toLowerCase();
+        final cardNumber = cardNo.isEmpty
+            ? 'C-${DateTime.now().millisecondsSinceEpoch}-$rowIndex'
+            : cardNo;
         cards.add(CustodyCard(
           id: const Uuid().v4(),
-          cardNumber: cardNo.isEmpty ? 'C-${DateTime.now().millisecondsSinceEpoch}-$r' : cardNo,
-          employeeName: empName.isEmpty ? 'موظف مستورد' : empName,
-          jobTitle: jobCol != null ? _cellStr(row.length > jobCol ? row[jobCol] : null) : '',
-          directorate: 'وزارة الطوارئ وإدارة الكوارث',
-          workCenter: '',
-          department: deptCol != null ? _cellStr(row.length > deptCol ? row[deptCol] : null) : 'دائرة الاتصالات',
-          division: divisionCol != null ? _cellStr(row.length > divisionCol ? row[divisionCol] : null) : '',
-          officeOrCenter: '',
-          creationDate: dateCol != null ? _cellStr(row.length > dateCol ? row[dateCol] : null) : now.split('T').first,
-          items: [],
+          cardNumber: cardNumber,
+          employeeName: employeeName.isEmpty ? 'موظف مستورد' : employeeName,
+          jobTitle: cell(row, jobCol),
+          directorate: cell(row, directorateCol),
+          workCenter: cell(row, workCenterCol),
+          department: cell(row, deptCol),
+          division: cell(row, divisionCol),
+          officeOrCenter: cell(row, officeCol),
+          creationDate: cell(row, dateCol).isEmpty
+              ? now.split('T').first
+              : cell(row, dateCol),
+          items: itemsByCard[cardNumber] ?? const [],
           employeeSignature: '',
           deliveryOfficerSignature: '',
           deptHeadSignature: '',
           warehouseKeeperSignature: '',
-          adminEndorsement: '',
+          adminEndorsement: cell(row, endorsementCol),
           endorsementDate: '',
-          status: 'active',
+          status: statusText.contains('مؤرش') || statusText.contains('archiv')
+              ? 'archived'
+              : 'active',
           createdAt: now,
           updatedAt: now,
         ));
       }
 
+      if (cards.isEmpty) {
+        return ImportResult(success: false, message: 'لم يتم العثور على بيانات بطاقات عهدة', items: []);
+      }
+      final importedItems = cards.fold<int>(0, (total, card) => total + card.items.length);
       return ImportResult(
-        success: cards.isNotEmpty,
-        message: cards.isEmpty ? 'لم يتم العثور على بيانات' : 'تم استيراد ${cards.length} بطاقة عهدة',
+        success: true,
+        message: 'تم استيراد ${cards.length} بطاقة و${importedItems} مادة',
         items: cards,
       );
     } catch (e) {
-      return ImportResult(success: false, message: 'خطأ: $e', items: []);
+      return ImportResult(success: false, message: 'خطأ في قراءة ملف العهدة: $e', items: []);
     }
   }
 
