@@ -59,3 +59,12 @@ The active Flutter code on `feature/supabase-admin-handover` has been converted 
 ## Current status
 
 The Supabase-only source refactor, initial database access controls, and switch/port workflow are in place on the feature branch. CI run #175 has passed static analysis, unit/widget tests, and the Web release build; Android release APK compilation and artifact upload are still pending. The project is not yet a fully production-published application: real interactive sign-in/CRUD checks, USB/camera acceptance testing, production Android signing, and administrator handover to a verified target Supabase project remain outstanding. The default branch remains untouched.
+
+
+## Verification update — 16 November 2026
+
+GitHub Actions [run #256](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43831436946), commit `070a221c16120cfa3d5cc1bfd28fe9596f4b0211`, completed successfully for static analysis, unit/widget tests, Web, Android APK/AAB, and unsigned iOS. This confirms build compatibility for all three targets, not production signing or device acceptance.
+
+The active dependency manifest and lockfile contain no direct Firebase packages, and the old Firebase Dart option/service files are absent from the branch. The native Android package still includes Firebase component/encoder metadata through the Google ML Kit barcode-scanning dependency chain; these are not used as the app backend or auth provider. Removing that transitive native metadata would require replacing or reworking the camera-scanning implementation and validating barcode behavior before release.
+
+Remaining release gates: owner-managed Android signing, Apple signing and IPA/TestFlight workflow, real browser/mobile/USB-camera acceptance tests, and the owner's explicit decision on PR merge. Database handover remains deferred.
