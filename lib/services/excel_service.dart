@@ -285,7 +285,7 @@ class ExcelService {
     final devSheet = excel['الأجهزة'];
     final devHeaders = [
       'م', 'اسم الجهاز', 'التصنيف', 'الشركة', 'الطراز', 'الرقم التسلسلي',
-      'رقم العهدة', 'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'ملاحظات',
+      'الباركود', 'رقم العهدة', 'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'ملاحظات',
     ];
     for (var i = 0; i < devHeaders.length; i++) {
       devSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -295,7 +295,7 @@ class ExcelService {
       final d = devices[i];
       final vals = [
         '${i + 1}', d.name, d.category.labelAr, d.manufacturer, d.model,
-        d.serialNumber, d.assetNumber, d.condition.labelAr, d.status.labelAr,
+        d.serialNumber, d.barcode, d.assetNumber, d.condition.labelAr, d.status.labelAr,
         d.location, d.assignedEmployee ?? '', d.notes ?? '',
       ];
       for (var c = 0; c < vals.length; c++) {
@@ -328,14 +328,14 @@ class ExcelService {
 
     // --- الحركات ---
     final movSheet = excel['الحركات'];
-    final movHeaders = ['رقم السند', 'النوع', 'الجهاز', 'من', 'إلى', 'التاريخ', 'السبب'];
+    final movHeaders = ['رقم السند', 'النوع', 'الجهاز', 'الرقم التسلسلي', 'الباركود', 'من', 'إلى', 'المنفذ', 'التاريخ', 'السبب', 'ملاحظات'];
     for (var i = 0; i < movHeaders.length; i++) {
       movSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(movHeaders[i]);
     }
     for (var i = 0; i < movements.length; i++) {
       final m = movements[i];
-      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.fromEntity, m.toEntity, m.date, m.reason];
+      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.serialNumber, m.barcode, m.fromEntity, m.toEntity, m.executorName, m.date, m.reason, m.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         movSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
