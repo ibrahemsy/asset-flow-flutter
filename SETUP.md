@@ -115,3 +115,17 @@ flutter build apk --release
 - تم تشديد شروط GitHub Actions: لا تُسمّى مخرجات Android بأنها موقّعة إنتاجياً إلا إذا كانت أسرار التوقيع الأربعة كلها موجودة (Base64 keystore وكلمتا المرور واسم alias). إذا نقص أي سر، تُصنّف المخرجات Testing only.
 - لم تُضف أسرار توقيع المالك إلى المستودع أو المحادثة.
 - أضيف إلى CI فحص وقائي يرفض أي مرجع إلى Firebase SDK أو ملفات Firebase القديمة داخل `lib/` أو `pubspec.yaml`؛ لا يمنع ذلك مكتبات Google الأصلية الانتقالية التي قد يعتمد عليها ماسح الباركود.
+
+
+## أحدث تحقق آلي — 16 نوفمبر 2026 (CI #256)
+
+تم التحقق من commit `070a221c16120cfa3d5cc1bfd28fe9596f4b0211` عبر [GitHub Actions run #256](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43831436946). نجحت مهمتا `analyze-and-test` و`build-ios-unsigned` بالكامل، بما يشمل تحليل Flutter والاختبارات وبناء Web وAndroid APK/AAB وiOS.
+
+المخرجات الحالية:
+- `asset-flow-web`
+- `asset-flow-android-apk-testing-only`
+- `asset-flow-android-aab-testing-only`
+- `asset-flow-ios-unsigned-app`
+- `asset-flow-ios-project`
+
+مخرجات Android الحالية ما زالت Testing only لأن أسرار توقيع المالك غير مهيأة في GitHub Actions. ومخرج iOS غير موقّع. لذلك هذا تحقق بناء ناجح وليس إصداراً إنتاجياً قابلاً للنشر في المتاجر. يتطلب الإطلاق توقيع Android بمفتاح المالك، وتوقيع iOS بحساب Apple Developer وشهادة توزيع وملف Provisioning Profile، ثم اختبارات قبول على أجهزة فعلية.
