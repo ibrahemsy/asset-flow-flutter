@@ -99,6 +99,7 @@ class ExcelService {
       'عدد المواد',
       'الحالة',
       'المصادقة الإدارية',
+      'ملاحظات',
     ];
     for (var i = 0; i < headers.length; i++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
@@ -120,6 +121,7 @@ class ExcelService {
         c.items.length.toString(),
         c.status == 'active' ? 'نشطة' : (c.status == 'archived' ? 'مؤرشفة' : c.status),
         c.adminEndorsement,
+        c.notes,
       ];
       for (var col = 0; col < values.length; col++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value =
@@ -141,6 +143,10 @@ class ExcelService {
       'الباركود',
       'رمز المادة',
       'الرصيد',
+      'تفاصيل الاستلام',
+      'تاريخ الاستلام',
+      'تفاصيل الإرجاع',
+      'تاريخ الإرجاع',
       'ملاحظات',
     ];
     for (var i = 0; i < itemHeaders.length; i++) {
@@ -162,6 +168,10 @@ class ExcelService {
           item.barcode,
           item.itemCode,
           item.balance.toString(),
+          item.receiptDetails,
+          item.receiptDate,
+          item.returnDetails,
+          item.returnDate,
           item.notes,
         ];
         for (var col = 0; col < values.length; col++) {
