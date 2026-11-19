@@ -67,8 +67,9 @@ jobs:
       - name: Unit and widget tests
         run: flutter test --no-pub
 
-      - name: Build Web
-        run: flutter build web --release --base-href /asset-flow-flutter/
+      # Netlify serves the app at the domain root, so the base href must be /.
+      - name: Build Web for Netlify
+        run: flutter build web --release --base-href /
 
       - name: Configure Android release signing when keystore is present
         env:
@@ -101,23 +102,16 @@ jobs:
           if-no-files-found: error
 
       - name: Deploy Flutter Web to Netlify
-        continue-on-error: true
         if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
           if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
-            echo "::notice::Netlify secrets are not configured yet; skipping deployment."
-            exit 0
+            echo "::error::NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID is missing from GitHub Actions secrets."
+            exit 1
           fi
           npx --yes netlify-cli@latest deploy --prod --dir=build/web --site="$NETLIFY_SITE_ID"
-
-      - name: Upload GitHub Pages artifact
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web/
 
       - name: Upload Android APK (production-signed)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
@@ -199,18 +193,3 @@ jobs:
           name: asset-flow-ios-project
           path: ios/
           if-no-files-found: error
-
-  deploy-github-pages:
-    needs: analyze-and-test
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
