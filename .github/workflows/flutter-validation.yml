@@ -105,7 +105,12 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: npx --yes netlify-cli@latest deploy --prod --dir=build/web --site="$NETLIFY_SITE_ID"
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::notice::Netlify secrets are not configured yet; skipping deployment."
+            exit 0
+          fi
+          npx --yes netlify-cli@latest deploy --prod --dir=build/web --site="$NETLIFY_SITE_ID"
 
       - name: Upload Android APK (production-signed)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
