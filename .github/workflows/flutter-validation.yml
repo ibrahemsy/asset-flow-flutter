@@ -2,7 +2,7 @@ name: Flutter validation
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/supabase-admin-handover]
   pull_request:
     branches: [main, feature/supabase-admin-handover]
   workflow_dispatch:
@@ -99,6 +99,13 @@ jobs:
           name: asset-flow-web
           path: build/web/
           if-no-files-found: error
+
+      - name: Deploy Flutter Web to Netlify
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: npx --yes netlify-cli@latest deploy --prod --dir=build/web --site="$NETLIFY_SITE_ID"
 
       - name: Upload Android APK (production-signed)
         if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
