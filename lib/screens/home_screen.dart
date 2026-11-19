@@ -14,6 +14,7 @@ import 'approvals_screen.dart';
 import 'audit_screen.dart';
 import 'users_screen.dart';
 import 'network_map_screen.dart';
+import 'network_switches_screen.dart';
 import 'help_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -48,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return const TelecomScreen();
       case 'network_map':
         return const NetworkMapScreen();
+      case 'switches':
+        return const NetworkSwitchesScreen();
       case 'maintenance':
         return const MaintenanceScreen();
       case 'reports':
@@ -134,6 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   case 'telecom':
                     app.setActiveTab('telecom');
                     break;
+                  case 'switches':
+                    app.setActiveTab('switches');
+                    break;
                   case 'movements':
                     app.setActiveTab('movements');
                     break;
@@ -153,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         radius: 16,
                         backgroundColor: AppTheme.primary.withOpacity(0.15),
                         child: Text(
-                          (app.currentUser?.displayName ?? '?')[0],
+                          (app.currentUserName.isNotEmpty ? app.currentUserName[0] : '?'),
                           style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
                         ),
                       ),
@@ -163,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              app.currentUser?.displayName ?? '',
+                              app.currentUserName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -207,6 +213,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(AppIcons.telecom, size: 20),
                     title: Text('الهواتف', style: TextStyle(fontSize: 13)),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'switches',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.hub_outlined, size: 20),
+                    title: Text('السويتشات والمنافذ', style: TextStyle(fontSize: 13)),
                   ),
                 ),
                 const PopupMenuItem(
@@ -263,7 +278,33 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               )
-            : _buildBody(app.activeTab),
+            : app.loadError != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_off_rounded, size: 52, color: AppTheme.danger),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'تعذر تحميل بيانات النظام',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(app.loadError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 18),
+                          ElevatedButton.icon(
+                            onPressed: app.isSyncing ? null : app.refreshData,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('إعادة المحاولة'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : _buildBody(app.activeTab),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _bottomIndex,
           onDestinationSelected: (i) {
@@ -323,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 22,
                   backgroundColor: Colors.white.withOpacity(0.2),
                   child: Text(
-                    (app.currentUser?.displayName ?? '?')[0],
+                    (app.currentUserName.isNotEmpty ? app.currentUserName[0] : '?'),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ),
@@ -333,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        app.currentUser?.displayName ?? '',
+                        app.currentUserName,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),

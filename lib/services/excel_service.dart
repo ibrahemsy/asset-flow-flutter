@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -91,6 +89,7 @@ class ExcelService {
     final headers = [
       'رقم البطاقة',
       'اسم الموظف',
+      'رقم الهوية',
       'الصفة الوظيفية',
       'المديرية',
       'الدائرة',
@@ -101,6 +100,12 @@ class ExcelService {
       'عدد المواد',
       'الحالة',
       'المصادقة الإدارية',
+      'تاريخ المصادقة',
+      'توقيع الموظف',
+      'توقيع مسؤول التسليم',
+      'توقيع رئيس الدائرة',
+      'توقيع أمين المستودع',
+      'ملاحظات',
     ];
     for (var i = 0; i < headers.length; i++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
@@ -112,6 +117,7 @@ class ExcelService {
       final values = [
         c.cardNumber,
         c.employeeName,
+        c.nationalId,
         c.jobTitle,
         c.directorate,
         c.department,
@@ -122,6 +128,12 @@ class ExcelService {
         c.items.length.toString(),
         c.status == 'active' ? 'نشطة' : (c.status == 'archived' ? 'مؤرشفة' : c.status),
         c.adminEndorsement,
+        c.endorsementDate,
+        c.employeeSignature,
+        c.deliveryOfficerSignature,
+        c.deptHeadSignature,
+        c.warehouseKeeperSignature,
+        c.notes ?? '',
       ];
       for (var col = 0; col < values.length; col++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value =
@@ -143,6 +155,10 @@ class ExcelService {
       'الباركود',
       'رمز المادة',
       'الرصيد',
+      'تفاصيل الاستلام',
+      'تاريخ الاستلام',
+      'تفاصيل الإرجاع',
+      'تاريخ الإرجاع',
       'ملاحظات',
     ];
     for (var i = 0; i < itemHeaders.length; i++) {
@@ -164,6 +180,10 @@ class ExcelService {
           item.barcode,
           item.itemCode,
           item.balance.toString(),
+          item.receiptDetails,
+          item.receiptDate,
+          item.returnDetails,
+          item.returnDate,
           item.notes,
         ];
         for (var col = 0; col < values.length; col++) {
@@ -188,6 +208,7 @@ class ExcelService {
       'نوع الحركة',
       'اسم الجهاز',
       'الرقم التسلسلي',
+      'الباركود',
       'من',
       'إلى',
       'المنفذ',
@@ -206,6 +227,7 @@ class ExcelService {
         m.type.labelAr,
         m.deviceName,
         m.serialNumber,
+        m.barcode ?? '',
         m.fromEntity,
         m.toEntity,
         m.executorName,
@@ -230,17 +252,20 @@ class ExcelService {
 
     final headers = [
       'رقم البلاغ',
+      'معرّف الجهاز',
       'اسم الجهاز',
       'الرقم التسلسلي',
+      'الباركود',
       'وصف العطل',
       'القسم / المكتب',
       'تاريخ البلاغ',
       'الأولوية',
       'الفني المكلف',
-      'الإجراءات',
+      'الإجراءات المتخذة',
       'قطع الغيار',
       'تاريخ الإصلاح',
       'الحالة',
+      'تاريخ الإنشاء',
     ];
     for (var i = 0; i < headers.length; i++) {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(headers[i]);
@@ -250,8 +275,10 @@ class ExcelService {
       final t = tickets[i];
       final values = [
         t.ticketNumber,
+        t.deviceId ?? '',
         t.deviceName,
         t.serialNumber ?? '',
+        t.barcode ?? '',
         t.faultDescription,
         t.stationOrDept,
         t.reportDate,
@@ -261,6 +288,7 @@ class ExcelService {
         t.sparePartsUsed,
         t.resolutionDate ?? '',
         t.status.labelAr,
+        t.createdAt,
       ];
       for (var c = 0; c < values.length; c++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
@@ -287,7 +315,9 @@ class ExcelService {
     final devSheet = excel['الأجهزة'];
     final devHeaders = [
       'م', 'اسم الجهاز', 'التصنيف', 'الشركة', 'الطراز', 'الرقم التسلسلي',
-      'رقم العهدة', 'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'ملاحظات',
+      'الباركود', 'رقم العهدة', 'المعالج CPU', 'الذاكرة RAM', 'التخزين Storage',
+      'الحالة الفنية', 'حالة التواجد', 'الموقع', 'الموظف', 'تاريخ الشراء',
+      'المورد', 'تاريخ التسليم', 'ملاحظات',
     ];
     for (var i = 0; i < devHeaders.length; i++) {
       devSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -297,8 +327,10 @@ class ExcelService {
       final d = devices[i];
       final vals = [
         '${i + 1}', d.name, d.category.labelAr, d.manufacturer, d.model,
-        d.serialNumber, d.assetNumber, d.condition.labelAr, d.status.labelAr,
-        d.location, d.assignedEmployee ?? '', d.notes ?? '',
+        d.serialNumber, d.barcode, d.assetNumber, d.cpu ?? '', d.ram ?? '',
+        d.storage ?? '', d.condition.labelAr, d.status.labelAr, d.location,
+        d.assignedEmployee ?? '', d.purchaseDate, d.supplier, d.deliveryDate ?? '',
+        d.notes ?? '',
       ];
       for (var c = 0; c < vals.length; c++) {
         devSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
@@ -309,8 +341,10 @@ class ExcelService {
     // --- العهدة ---
     final cardSheet = excel['بطاقات العهدة'];
     final cardHeaders = [
-      'رقم البطاقة', 'اسم الموظف', 'الوظيفة', 'الدائرة', 'الشعبة',
-      'تاريخ الإنشاء', 'عدد المواد', 'الحالة',
+      'رقم البطاقة', 'اسم الموظف', 'رقم الهوية', 'الوظيفة', 'المديرية', 'الدائرة',
+      'الشعبة', 'المكتب', 'مركز العمل', 'تاريخ الإنشاء', 'عدد المواد',
+      'الحالة', 'المصادقة الإدارية', 'تاريخ المصادقة', 'توقيع الموظف',
+      'توقيع مسؤول التسليم', 'توقيع رئيس الدائرة', 'توقيع أمين المستودع', 'ملاحظات',
     ];
     for (var i = 0; i < cardHeaders.length; i++) {
       cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
@@ -319,8 +353,11 @@ class ExcelService {
     for (var i = 0; i < cards.length; i++) {
       final c = cards[i];
       final vals = [
-        c.cardNumber, c.employeeName, c.jobTitle, c.department, c.division,
-        c.creationDate, '${c.items.length}', c.status,
+        c.cardNumber, c.employeeName, c.nationalId, c.jobTitle, c.directorate, c.department,
+        c.division, c.officeOrCenter, c.workCenter, c.creationDate,
+        '${c.items.length}', c.status, c.adminEndorsement, c.endorsementDate,
+        c.employeeSignature, c.deliveryOfficerSignature, c.deptHeadSignature,
+        c.warehouseKeeperSignature, c.notes ?? '',
       ];
       for (var col = 0; col < vals.length; col++) {
         cardSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1)).value =
@@ -328,16 +365,45 @@ class ExcelService {
       }
     }
 
+    // --- تفاصيل مواد العهدة ---
+    final cardItemsSheet = excel['تفاصيل مواد العهدة'];
+    final cardItemHeaders = [
+      'رقم البطاقة', 'اسم الموظف', 'م', 'اسم المادة', 'الوصف', 'الوحدة',
+      'الكمية', 'الرقم التسلسلي', 'الباركود', 'رمز المادة', 'الرصيد',
+      'تفاصيل الاستلام', 'تاريخ الاستلام', 'تفاصيل الإرجاع', 'تاريخ الإرجاع',
+      'ملاحظات',
+    ];
+    for (var i = 0; i < cardItemHeaders.length; i++) {
+      cardItemsSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
+          TextCellValue(cardItemHeaders[i]);
+    }
+    var cardItemRow = 1;
+    for (final card in cards) {
+      for (final item in card.items) {
+        final values = [
+          card.cardNumber, card.employeeName, item.no.toString(), item.name,
+          item.description, item.unit, item.quantity.toString(), item.serialNumber,
+          item.barcode, item.itemCode, item.balance.toString(), item.receiptDetails,
+          item.receiptDate, item.returnDetails, item.returnDate, item.notes,
+        ];
+        for (var col = 0; col < values.length; col++) {
+          cardItemsSheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: cardItemRow)).value =
+              TextCellValue(values[col]);
+        }
+        cardItemRow++;
+      }
+    }
+
     // --- الحركات ---
     final movSheet = excel['الحركات'];
-    final movHeaders = ['رقم السند', 'النوع', 'الجهاز', 'من', 'إلى', 'التاريخ', 'السبب'];
+    final movHeaders = ['رقم السند', 'النوع', 'الجهاز', 'الرقم التسلسلي', 'الباركود', 'من', 'إلى', 'المنفذ', 'التاريخ', 'السبب', 'ملاحظات'];
     for (var i = 0; i < movHeaders.length; i++) {
       movSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(movHeaders[i]);
     }
     for (var i = 0; i < movements.length; i++) {
       final m = movements[i];
-      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.fromEntity, m.toEntity, m.date, m.reason];
+      final vals = [m.referenceNumber, m.type.labelAr, m.deviceName, m.serialNumber, m.barcode ?? '', m.fromEntity, m.toEntity, m.executorName, m.date, m.reason, m.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         movSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -346,14 +412,23 @@ class ExcelService {
 
     // --- الصيانة ---
     final tktSheet = excel['الصيانة'];
-    final tktHeaders = ['رقم البلاغ', 'الجهاز', 'العطل', 'الأولوية', 'الحالة', 'التاريخ'];
+    final tktHeaders = [
+      'رقم البلاغ', 'معرّف الجهاز', 'الجهاز', 'الرقم التسلسلي', 'الباركود',
+      'وصف العطل', 'القسم / المكتب', 'تاريخ البلاغ', 'الأولوية', 'الفني المكلف',
+      'الإجراءات المتخذة', 'قطع الغيار', 'تاريخ الإصلاح', 'الحالة', 'تاريخ الإنشاء',
+    ];
     for (var i = 0; i < tktHeaders.length; i++) {
       tktSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(tktHeaders[i]);
     }
     for (var i = 0; i < tickets.length; i++) {
       final t = tickets[i];
-      final vals = [t.ticketNumber, t.deviceName, t.faultDescription, t.priority.labelAr, t.status.labelAr, t.reportDate];
+      final vals = [
+        t.ticketNumber, t.deviceId ?? '', t.deviceName, t.serialNumber ?? '',
+        t.barcode ?? '', t.faultDescription, t.stationOrDept, t.reportDate,
+        t.priority.labelAr, t.assignedTech, t.actionsTaken, t.sparePartsUsed,
+        t.resolutionDate ?? '', t.status.labelAr, t.createdAt,
+      ];
       for (var c = 0; c < vals.length; c++) {
         tktSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -362,14 +437,15 @@ class ExcelService {
 
     // --- الهواتف ---
     final phoneSheet = excel['دليل الهواتف'];
-    final phoneHeaders = ['الرقم', 'الموظف', 'القسم', 'المكتب', 'منفذ PBX', 'الحالة'];
+    final phoneHeaders = ['الرقم', 'الموظف', 'القسم', 'المكتب', 'منفذ PBX', 'رقم النقطة', 'الحالة', 'ملاحظات'];
     for (var i = 0; i < phoneHeaders.length; i++) {
       phoneSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(phoneHeaders[i]);
     }
     for (var i = 0; i < phones.length; i++) {
       final p = phones[i];
-      final vals = [p.phoneNumber, p.employeeName, p.department, p.officeLocation, p.pbxPortNumber, p.status];
+      final vals = [p.phoneNumber, p.employeeName, p.department, p.officeLocation,
+        p.pbxPortNumber, p.pointNumber ?? '', p.status, p.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         phoneSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -378,14 +454,15 @@ class ExcelService {
 
     // --- الشبكات ---
     final netSheet = excel['الشبكات'];
-    final netHeaders = ['الاسم', 'النوع', 'نطاق IP', 'البوابة', 'الموقع', 'الحالة'];
+    final netHeaders = ['الاسم', 'النوع', 'نطاق IP', 'البوابة', 'عرض النطاق', 'التردد', 'الموقع', 'الحالة', 'ملاحظات'];
     for (var i = 0; i < netHeaders.length; i++) {
       netSheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value =
           TextCellValue(netHeaders[i]);
     }
     for (var i = 0; i < networks.length; i++) {
       final n = networks[i];
-      final vals = [n.name, n.type, n.ipRange ?? '', n.gateway ?? '', n.location, n.status];
+      final vals = [n.name, n.type, n.ipRange ?? '', n.gateway ?? '', n.bandwidth ?? '',
+        n.frequency ?? '', n.location, n.status, n.notes ?? ''];
       for (var c = 0; c < vals.length; c++) {
         netSheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: i + 1)).value =
             TextCellValue(vals[c]);
@@ -401,7 +478,7 @@ class ExcelService {
 
   /// اختيار ملف Excel واستيراد أجهزة منه
   Future<ImportResult<Device>> importDevicesFromFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
@@ -427,7 +504,7 @@ class ExcelService {
       }
 
       final sheet = excel.tables.values.first;
-      if (sheet == null || sheet.maxRows < 2) {
+      if (sheet.maxRows < 2) {
         return ImportResult(success: false, message: 'لا توجد بيانات في الملف', items: []);
       }
 
@@ -469,6 +546,10 @@ class ExcelService {
       final statusCol = col(['حالة التواجد', 'status', 'الحالة']);
       final supplierCol = col(['المورد', 'supplier']);
       final purchaseCol = col(['تاريخ الشراء', 'تاريخ التوريد', 'purchase', 'purchasedate']);
+      final cpuCol = col(['المعالج cpu', 'المعالج', 'cpu', 'processor']);
+      final ramCol = col(['الذاكرة ram', 'الذاكرة', 'ram', 'memory']);
+      final storageCol = col(['التخزين storage', 'التخزين', 'storage', 'disk']);
+      final deliveryCol = col(['تاريخ التسليم', 'delivery date', 'deliverydate']);
 
       if (nameCol == null && serialCol == null) {
         return ImportResult(
@@ -509,6 +590,10 @@ class ExcelService {
           assetNumber: assetCol != null ? _cellStr(row.length > assetCol ? row[assetCol] : null) : '',
           purchaseDate: purchaseCol != null ? _cellStr(row.length > purchaseCol ? row[purchaseCol] : null) : now.split('T').first,
           supplier: supplierCol != null ? _cellStr(row.length > supplierCol ? row[supplierCol] : null) : '',
+          cpu: cpuCol != null ? _cellStr(row.length > cpuCol ? row[cpuCol] : null) : null,
+          ram: ramCol != null ? _cellStr(row.length > ramCol ? row[ramCol] : null) : null,
+          storage: storageCol != null ? _cellStr(row.length > storageCol ? row[storageCol] : null) : null,
+          deliveryDate: deliveryCol != null ? _cellStr(row.length > deliveryCol ? row[deliveryCol] : null) : null,
           condition: _parseCondition(conditionStr),
           status: _parseStatus(statusStr),
           location: locationCol != null ? _cellStr(row.length > locationCol ? row[locationCol] : null) : '',
@@ -536,7 +621,7 @@ class ExcelService {
 
   /// استيراد بطاقات عهدة (بنية مبسطة)
   Future<ImportResult<CustodyCard>> importCustodyCardsFromFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
@@ -548,80 +633,181 @@ class ExcelService {
     if (bytes == null) {
       return ImportResult(success: false, message: 'تعذر قراءة الملف', items: []);
     }
+    return importCustodyCardsFromBytes(bytes);
+  }
 
+  /// استيراد بطاقات العهدة وموادها من ورقتي التصدير معاً.
+  ImportResult<CustodyCard> importCustodyCardsFromBytes(Uint8List bytes) {
     try {
-      final excel = Excel.decodeBytes(bytes);
-      final sheet = excel.tables.values.first;
-      if (sheet == null || sheet.maxRows < 2) {
-        return ImportResult(success: false, message: 'لا توجد بيانات', items: []);
+      final workbook = Excel.decodeBytes(bytes);
+      if (workbook.tables.isEmpty) {
+        return ImportResult(success: false, message: 'الملف فارغ أو غير صالح', items: []);
       }
 
-      final headerRow = sheet.rows.first;
-      final headerMap = <String, int>{};
-      for (var i = 0; i < headerRow.length; i++) {
-        final val = _cellStr(headerRow[i]).trim().toLowerCase();
-        if (val.isNotEmpty) headerMap[val] = i;
+      final cardSheet = workbook.tables['بطاقات العهدة'] ?? workbook.tables.values.first;
+      if (cardSheet.maxRows < 2) {
+        return ImportResult(success: false, message: 'لا توجد بيانات بطاقات عهدة', items: []);
       }
 
-      int? col(List<String> names) {
-        for (final n in names) {
-          if (headerMap.containsKey(n.toLowerCase())) return headerMap[n.toLowerCase()];
+      Map<String, int> headersOf(Sheet sheet) {
+        final result = <String, int>{};
+        final headerRow = sheet.rows.first;
+        for (var i = 0; i < headerRow.length; i++) {
+          final value = _cellStr(headerRow[i]).trim().toLowerCase();
+          if (value.isNotEmpty) result[value] = i;
         }
-        for (final entry in headerMap.entries) {
-          for (final n in names) {
-            if (entry.key.contains(n.toLowerCase())) return entry.value;
+        return result;
+      }
+
+      int? findColumn(Map<String, int> headers, List<String> names) {
+        for (final name in names) {
+          final index = headers[name.toLowerCase()];
+          if (index != null) return index;
+        }
+        for (final entry in headers.entries) {
+          for (final name in names) {
+            final normalized = name.toLowerCase();
+            if (entry.key.length >= 3 && entry.key.contains(normalized)) {
+              return entry.value;
+            }
           }
         }
         return null;
       }
 
-      final cardNoCol = col(['رقم البطاقة', 'cardnumber', 'البطاقة']);
-      final nameCol = col(['اسم الموظف', 'الاسم', 'employee', 'الاسم الثلاثي']);
-      final jobCol = col(['الصفة الوظيفية', 'الوظيفة', 'jobtitle', 'الوظيفة']);
-      final deptCol = col(['الدائرة', 'department']);
-      final divisionCol = col(['الشعبة', 'division']);
-      final dateCol = col(['تاريخ الإنشاء', 'التاريخ', 'creationdate', 'date']);
+      String cell(List<Data?> row, int? index) =>
+          index == null || index >= row.length ? '' : _cellStr(row[index]).trim();
+      int number(String value, {int fallback = 0}) =>
+          int.tryParse(value.replaceAll(',', '').trim()) ?? fallback;
 
-      final cards = <CustodyCard>[];
+      final cardHeaders = headersOf(cardSheet);
+      final cardNoCol = findColumn(cardHeaders, ['رقم البطاقة', 'cardnumber']);
+      final nameCol = findColumn(cardHeaders, ['اسم الموظف', 'employee name', 'الاسم']);
+      final jobCol = findColumn(cardHeaders, ['الصفة الوظيفية', 'الوظيفة', 'jobtitle']);
+      final directorateCol = findColumn(cardHeaders, ['المديرية', 'directorate']);
+      final deptCol = findColumn(cardHeaders, ['الدائرة', 'department']);
+      final divisionCol = findColumn(cardHeaders, ['الشعبة', 'division']);
+      final officeCol = findColumn(cardHeaders, ['المكتب', 'office']);
+      final workCenterCol = findColumn(cardHeaders, ['مركز العمل', 'work center']);
+      final dateCol = findColumn(cardHeaders, ['تاريخ الإنشاء', 'creationdate', 'التاريخ']);
+      final statusCol = findColumn(cardHeaders, ['الحالة', 'status']);
+      final nationalIdCol = findColumn(cardHeaders, ['رقم الهوية', 'الرقم الوطني', 'nationalid']);
+      final endorsementCol = findColumn(cardHeaders, ['المصادقة الإدارية', 'admin endorsement']);
+      final endorsementDateCol = findColumn(cardHeaders, ['تاريخ المصادقة', 'endorsement date']);
+      final employeeSignatureCol = findColumn(cardHeaders, ['توقيع الموظف', 'employee signature']);
+      final deliverySignatureCol = findColumn(cardHeaders, ['توقيع مسؤول التسليم', 'delivery officer signature']);
+      final deptHeadSignatureCol = findColumn(cardHeaders, ['توقيع رئيس الدائرة', 'department head signature']);
+      final warehouseSignatureCol = findColumn(cardHeaders, ['توقيع أمين المستودع', 'warehouse keeper signature']);
+
+      final itemsByCard = <String, List<CustodyCardItem>>{};
+      Sheet? itemsSheet = workbook.tables['تفاصيل مواد العهدة'];
+      if (itemsSheet == null) {
+        for (final entry in workbook.tables.entries) {
+          if (entry.key.contains('تفاصيل')) {
+            itemsSheet = entry.value;
+            break;
+          }
+        }
+      }
+      if (itemsSheet != null && itemsSheet.maxRows > 1) {
+        final itemHeaders = headersOf(itemsSheet);
+        final itemCardCol = findColumn(itemHeaders, ['رقم البطاقة', 'cardnumber']);
+        final itemNoCol = findColumn(itemHeaders, ['م', 'رقم المادة', 'no']);
+        final itemNameCol = findColumn(itemHeaders, ['اسم المادة', 'المادة', 'name']);
+        final descriptionCol = findColumn(itemHeaders, ['الوصف', 'description']);
+        final unitCol = findColumn(itemHeaders, ['الوحدة', 'unit']);
+        final quantityCol = findColumn(itemHeaders, ['الكمية', 'quantity']);
+        final serialCol = findColumn(itemHeaders, ['الرقم التسلسلي', 'serial']);
+        final barcodeCol = findColumn(itemHeaders, ['الباركود', 'barcode']);
+        final itemCodeCol = findColumn(itemHeaders, ['رمز المادة', 'itemcode']);
+        final balanceCol = findColumn(itemHeaders, ['الرصيد', 'balance']);
+        final receiptDetailsCol = findColumn(itemHeaders, ['تفاصيل الاستلام', 'receipt details']);
+        final receiptDateCol = findColumn(itemHeaders, ['تاريخ الاستلام', 'receipt date']);
+        final returnDetailsCol = findColumn(itemHeaders, ['تفاصيل الإرجاع', 'return details']);
+        final returnDateCol = findColumn(itemHeaders, ['تاريخ الإرجاع', 'return date']);
+        final notesCol = findColumn(itemHeaders, ['ملاحظات', 'notes']);
+
+        for (var rowIndex = 1; rowIndex < itemsSheet.maxRows; rowIndex++) {
+          final row = itemsSheet.rows[rowIndex];
+          final cardNo = cell(row, itemCardCol);
+          final itemName = cell(row, itemNameCol);
+          if (cardNo.isEmpty || itemName.isEmpty) continue;
+          final quantity = number(cell(row, quantityCol), fallback: 1);
+          final item = CustodyCardItem(
+            id: const Uuid().v4(),
+            no: number(cell(row, itemNoCol), fallback: (itemsByCard[cardNo]?.length ?? 0) + 1),
+            name: itemName,
+            description: cell(row, descriptionCol),
+            unit: cell(row, unitCol),
+            quantity: quantity,
+            serialNumber: cell(row, serialCol),
+            barcode: cell(row, barcodeCol),
+            itemCode: cell(row, itemCodeCol),
+            receiptDetails: cell(row, receiptDetailsCol),
+            receiptDate: cell(row, receiptDateCol),
+            returnDetails: cell(row, returnDetailsCol),
+            custodyNumber: cardNo,
+            returnDate: cell(row, returnDateCol),
+            balance: number(cell(row, balanceCol), fallback: quantity),
+            notes: cell(row, notesCol),
+          );
+          itemsByCard.putIfAbsent(cardNo, () => []).add(item);
+        }
+      }
+
       final now = DateTime.now().toIso8601String();
-
-      for (var r = 1; r < sheet.maxRows; r++) {
-        final row = sheet.rows[r];
-        final cardNo = cardNoCol != null ? _cellStr(row.length > cardNoCol ? row[cardNoCol] : null) : '';
-        final empName = nameCol != null ? _cellStr(row.length > nameCol ? row[nameCol] : null) : '';
-        if (cardNo.isEmpty && empName.isEmpty) continue;
-
+      final cards = <CustodyCard>[];
+      for (var rowIndex = 1; rowIndex < cardSheet.maxRows; rowIndex++) {
+        final row = cardSheet.rows[rowIndex];
+        final cardNo = cell(row, cardNoCol);
+        final employeeName = cell(row, nameCol);
+        if (cardNo.isEmpty && employeeName.isEmpty) continue;
+        final statusText = cell(row, statusCol).toLowerCase();
+        final cardNumber = cardNo.isEmpty
+            ? 'C-${DateTime.now().millisecondsSinceEpoch}-$rowIndex'
+            : cardNo;
         cards.add(CustodyCard(
           id: const Uuid().v4(),
-          cardNumber: cardNo.isEmpty ? 'C-${DateTime.now().millisecondsSinceEpoch}-$r' : cardNo,
-          employeeName: empName.isEmpty ? 'موظف مستورد' : empName,
-          jobTitle: jobCol != null ? _cellStr(row.length > jobCol ? row[jobCol] : null) : '',
-          directorate: 'وزارة الطوارئ وإدارة الكوارث',
-          workCenter: '',
-          department: deptCol != null ? _cellStr(row.length > deptCol ? row[deptCol] : null) : 'دائرة الاتصالات',
-          division: divisionCol != null ? _cellStr(row.length > divisionCol ? row[divisionCol] : null) : '',
-          officeOrCenter: '',
-          creationDate: dateCol != null ? _cellStr(row.length > dateCol ? row[dateCol] : null) : now.split('T').first,
-          items: [],
-          employeeSignature: '',
-          deliveryOfficerSignature: '',
-          deptHeadSignature: '',
-          warehouseKeeperSignature: '',
-          adminEndorsement: '',
-          endorsementDate: '',
-          status: 'active',
+          cardNumber: cardNumber,
+          employeeName: employeeName.isEmpty ? 'موظف مستورد' : employeeName,
+          nationalId: cell(row, nationalIdCol),
+          jobTitle: cell(row, jobCol),
+          directorate: cell(row, directorateCol),
+          workCenter: cell(row, workCenterCol),
+          department: cell(row, deptCol),
+          division: cell(row, divisionCol),
+          officeOrCenter: cell(row, officeCol),
+          creationDate: cell(row, dateCol).isEmpty
+              ? now.split('T').first
+              : cell(row, dateCol),
+          items: itemsByCard[cardNumber] ?? const [],
+          employeeSignature: cell(row, employeeSignatureCol),
+          deliveryOfficerSignature: cell(row, deliverySignatureCol),
+          deptHeadSignature: cell(row, deptHeadSignatureCol),
+          warehouseKeeperSignature: cell(row, warehouseSignatureCol),
+          adminEndorsement: cell(row, endorsementCol),
+          endorsementDate: cell(row, endorsementDateCol),
+          status: statusText.contains('مؤرش') || statusText.contains('archiv')
+              ? 'archived'
+              : (statusText.contains('pending') || statusText.contains('اعتماد')
+                  ? 'pending'
+                  : 'active'),
           createdAt: now,
           updatedAt: now,
         ));
       }
 
+      if (cards.isEmpty) {
+        return ImportResult(success: false, message: 'لم يتم العثور على بيانات بطاقات عهدة', items: []);
+      }
+      final importedItems = cards.fold<int>(0, (total, card) => total + card.items.length);
       return ImportResult(
-        success: cards.isNotEmpty,
-        message: cards.isEmpty ? 'لم يتم العثور على بيانات' : 'تم استيراد ${cards.length} بطاقة عهدة',
+        success: true,
+        message: 'تم استيراد ${cards.length} بطاقة و${importedItems} مادة',
         items: cards,
       );
     } catch (e) {
-      return ImportResult(success: false, message: 'خطأ: $e', items: []);
+      return ImportResult(success: false, message: 'خطأ في قراءة ملف العهدة: $e', items: []);
     }
   }
 
@@ -632,7 +818,7 @@ class ExcelService {
   String _cellStr(Data? cell) {
     if (cell == null || cell.value == null) return '';
     final v = cell.value;
-    if (v is TextCellValue) return v.value;
+    if (v is TextCellValue) return v.value.text ?? '';
     if (v is IntCellValue) return v.value.toString();
     if (v is DoubleCellValue) return v.value.toString();
     if (v is DateCellValue) {
@@ -684,18 +870,19 @@ class ExcelService {
     final bytes = excel.encode();
     if (bytes == null) return null;
 
-    final dir = await getTemporaryDirectory();
-    final path = '${dir.path}/$filename';
-    final file = File(path);
-    await file.writeAsBytes(bytes);
-
     await Share.shareXFiles(
-      [XFile(path)],
+      [
+        XFile.fromData(
+          Uint8List.fromList(bytes),
+          name: filename,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ),
+      ],
       subject: filename,
       text: 'تقرير دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث',
     );
 
-    return path;
+    return filename;
   }
 }
 

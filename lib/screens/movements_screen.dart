@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../models/models.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_theme.dart';
+import '../utils/device_lookup.dart';
 
 class MovementsScreen extends StatelessWidget {
   const MovementsScreen({super.key});
@@ -56,6 +58,7 @@ class MovementsScreen extends StatelessWidget {
     final fromCtrl = TextEditingController();
     final toCtrl = TextEditingController();
     final reasonCtrl = TextEditingController();
+    final barcodeCtrl = TextEditingController();
     MovementType type = MovementType.handover;
     Device? selectedDevice;
 
@@ -91,6 +94,51 @@ class MovementsScreen extends StatelessWidget {
                     onChanged: (v) => setModal(() => selectedDevice = v),
                   ),
                   const SizedBox(height: 10),
+                  TextField(
+                    controller: barcodeCtrl,
+                    autofocus: false,
+                    decoration: InputDecoration(
+                      labelText: 'مسح الباركود (USB أو كاميرا الهاتف)',
+                      hintText: 'امسح الرمز أو اكتبه هنا',
+                      prefixIcon: const Icon(Icons.qr_code_scanner_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: 'فتح الكاميرا',
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        onPressed: () async {
+                          final scanned = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            builder: (scanContext) => SizedBox(
+                              height: MediaQuery.of(scanContext).size.height * 0.72,
+                              child: MobileScanner(
+                                onDetect: (capture) {
+                                  final value = capture.barcodes
+                                      .map((barcode) => barcode.rawValue)
+                                      .whereType<String>()
+                                      .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+                                  if (value.isNotEmpty && scanContext.mounted) {
+                                    Navigator.of(scanContext).pop(value);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                          if (scanned != null) {
+                            barcodeCtrl.text = scanned;
+                            setModal(() => selectedDevice = findDeviceByScannedCode(app.devices, scanned));
+                          }
+                        },
+                      ),
+                    ),
+                    onChanged: (value) {
+                      final code = value.trim().toLowerCase();
+                      if (code.isEmpty) return;
+                      setModal(() => selectedDevice = findDeviceByScannedCode(app.devices, code));
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('يدعم قارئ USB الذي يكتب الرمز عبر لوحة المفاتيح، أو كاميرا الهاتف', style: TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 10),
                   TextField(controller: fromCtrl, decoration: const InputDecoration(labelText: 'من (المسلّم)')),
                   const SizedBox(height: 10),
                   TextField(controller: toCtrl, decoration: const InputDecoration(labelText: 'إلى (المستلم)')),
@@ -111,15 +159,22 @@ class MovementsScreen extends StatelessWidget {
                         barcode: selectedDevice!.barcode,
                         fromEntity: fromCtrl.text.trim(),
                         toEntity: toCtrl.text.trim(),
-                        executorName: app.currentUser?.displayName ?? '',
+                        executorName: app.currentUserName,
                         date: now.split('T').first,
                         reason: reasonCtrl.text.trim(),
                         createdAt: now,
                       );
                       final msg = await app.saveMovement(m);
                       if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg ?? 'تم الحفظ')));
+                        final failed = msg != null &&
+                            (msg.startsWith('خطأ:') || msg.contains('يجب تسجيل الدخول'));
+                        if (!failed) Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(msg ?? 'تم الحفظ'),
+                            backgroundColor: failed ? AppTheme.danger : null,
+                          ),
+                        );
                       }
                     },
                     child: const Text('حفظ السند'),
@@ -131,6 +186,12 @@ class MovementsScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      refCtrl.dispose();
+      fromCtrl.dispose();
+      toCtrl.dispose();
+      reasonCtrl.dispose();
+      barcodeCtrl.dispose();
+    });
   }
 }

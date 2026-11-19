@@ -8,7 +8,6 @@ flutter_*.png
 doc/api/
 .flutter-plugins
 .flutter-plugins-dependencies
-.metadata
 
 # IDE
 .idea/
@@ -18,11 +17,12 @@ doc/api/
 *.iws
 
 # Platform secrets (ضع ملفاتك محلياً بعد clone)
-**/google-services.json
-**/GoogleService-Info.plist
-**/firebase_app_id_file.json
 
 # Env / keys
+android/key.properties
+android/app/upload-keystore.jks
+*.jks
+*.keystore
 .env
 .env.*
 *.pem

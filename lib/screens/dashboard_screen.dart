@@ -27,7 +27,7 @@ class DashboardScreen extends StatelessWidget {
     final activeCards = app.custodyCards.where((c) => c.status == 'active').length;
 
     return RefreshIndicator(
-      onRefresh: () async {},
+      onRefresh: app.refreshData,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 80),
@@ -37,7 +37,7 @@ class DashboardScreen extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'مرحباً، ${app.currentUser?.displayName?.split(' ').first ?? ''}',
+                  'مرحباً، ${app.currentUserName.split(' ').first}',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),

@@ -1,40 +1,29 @@
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
-import '../services/backend_config.dart';
-import '../services/firebase_service.dart';
 import '../services/catalog_service.dart';
 import '../services/excel_service.dart';
 import '../services/sheets_service.dart';
+import '../services/supabase_service.dart';
 
 class AppProvider extends ChangeNotifier {
-  final FirebaseService _firebase = FirebaseService();
-  final BackendConfig _backend = BackendConfig();
+  final SupabaseService _supabase = SupabaseService();
   final CatalogService catalog = CatalogService();
+  final ExcelService _excel = ExcelService();
+  final SheetsService _sheets = SheetsService();
 
   User? currentUser;
   UserRoleType currentRole = UserRoleType.technician;
-  String headEmail = FirebaseService.defaultHeadEmail;
+  String headEmail = '';
   String departmentName = 'دائرة الاتصالات - وزارة الطوارئ وإدارة الكوارث';
-
   bool isLoading = true;
   bool isSyncing = false;
   bool isOffline = false;
+  String? loadError;
+  bool _isAdmin = false;
   String activeTab = 'dashboard';
-
-  /// عند true تفتح شاشة الأجهزة نموذج «إضافة جهاز»
   bool requestOpenAddDevice = false;
-
-  void openAddDevice() {
-    requestOpenAddDevice = true;
-    activeTab = 'devices';
-    notifyListeners();
-  }
-
-  void clearOpenAddDevice() {
-    requestOpenAddDevice = false;
-  }
 
   List<Device> devices = [];
   List<CustodyCard> custodyCards = [];
@@ -43,94 +32,90 @@ class AppProvider extends ChangeNotifier {
   List<AuditLog> auditLogs = [];
   List<PhoneDirectoryEntry> phoneDirectory = [];
   List<TelecomNetworkInfo> telecomNetworks = [];
+  List<Map<String, dynamic>> networkSwitches = [];
   List<PendingRequest> pendingRequests = [];
 
-  final List<StreamSubscription> _subs = [];
-
+  StreamSubscription<AuthState>? _authSubscription;
   bool get isLoggedIn => currentUser != null;
+  String get currentUserName => currentUser?.userMetadata?['display_name'] as String? ?? currentUser?.email?.split('@').first ?? '';
+  bool get isHeadOfDept => _isAdmin;
+  bool get isSystemAdmin => _isAdmin;
+  bool get isSupabaseBackend => true;
 
-  /// رئيس دائرة الاتصالات = مدير النظام
-  bool get isHeadOfDept =>
-      _backend.isSystemAdmin(currentUser?.email) ||
-      _firebase.isHeadOfDept(currentUser?.email, headEmail);
+  AppProvider() { _init(); }
 
-  /// مدير النظام (نفس رئيس الدائرة — صلاحيات كاملة)
-  bool get isSystemAdmin => isHeadOfDept;
+  void openAddDevice() { requestOpenAddDevice = true; activeTab = 'devices'; notifyListeners(); }
+  void clearOpenAddDevice() { requestOpenAddDevice = false; }
+  void setActiveTab(String tab) { activeTab = tab; notifyListeners(); }
 
-  BackendType get backendType => _backend.type;
-
-  AppProvider() {
-    _init();
+  /// Reloads the signed-in user's dashboard data when they pull to refresh.
+  Future<void> refreshData() async {
+    if (currentUser == null || isLoading || isSyncing) return;
+    await _loadSettingsAndData();
   }
 
   Future<void> _init() async {
     await catalog.load();
-    _subs.add(_firebase.authStateChanges.listen((user) async {
-      currentUser = user;
-      if (user != null) {
-        await _loadSettingsAndData();
-      } else {
+    currentUser = _supabase.currentUser;
+    _authSubscription = _supabase.authStateChanges.listen((state) async {
+      currentUser = state.session?.user;
+      if (currentUser == null) {
         _clearData();
+        _isAdmin = false;
         isLoading = false;
         notifyListeners();
+      } else {
+        await _loadSettingsAndData();
       }
-    }));
+    });
+    if (currentUser == null) {
+      isLoading = false;
+      notifyListeners();
+    } else {
+      await _loadSettingsAndData();
+    }
   }
 
   Future<void> _loadSettingsAndData() async {
     isLoading = true;
+    loadError = null;
     notifyListeners();
-
     try {
-      final settings = await _firebase.getSystemSettings();
-      headEmail = settings.headEmail;
-      departmentName = settings.departmentName;
-
-      if (isHeadOfDept) {
-        currentRole = UserRoleType.director;
+      final results = await Future.wait([
+        _supabase.currentAppRole(),
+        _supabase.isSystemAdmin(),
+        _supabase.fetchDevices(),
+        _supabase.fetchCustodyCards(),
+        _supabase.fetchMovements(),
+        _supabase.fetchTickets(),
+        _supabase.fetchAuditLogs(),
+        _supabase.fetchPhones(),
+        _supabase.fetchNetworks(),
+        _supabase.fetchPendingRequests(),
+      ]);
+      final role = results[0] as String?;
+      _isAdmin = results[1] as bool;
+      currentRole = role == 'primary_admin' || role == 'admin'
+          ? UserRoleType.director : UserRoleType.technician;
+      devices = results[2] as List<Device>;
+      custodyCards = results[3] as List<CustodyCard>;
+      movements = results[4] as List<Movement>;
+      tickets = results[5] as List<MaintenanceTicket>;
+      auditLogs = results[6] as List<AuditLog>;
+      phoneDirectory = results[7] as List<PhoneDirectoryEntry>;
+      telecomNetworks = results[8] as List<TelecomNetworkInfo>;
+      pendingRequests = results[9] as List<PendingRequest>;
+      try {
+        networkSwitches = await _supabase.fetchNetworkSwitches();
+      } catch (e) {
+        // A switch-table permission/schema issue must not block the core inventory.
+        networkSwitches = [];
+        debugPrint('Network switches load error: $e');
       }
-
-      // Cancel previous data subscriptions
-      for (final s in _subs.skip(1)) {
-        s.cancel();
-      }
-      _subs.removeRange(1, _subs.length);
-
-      _subs.add(_firebase.devicesStream().listen((list) {
-        devices = list;
-        catalog.syncFromDevices(list);
-        notifyListeners();
-      }));
-      _subs.add(_firebase.custodyCardsStream().listen((list) {
-        custodyCards = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.movementsStream().listen((list) {
-        movements = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.ticketsStream().listen((list) {
-        tickets = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.auditLogsStream().listen((list) {
-        auditLogs = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.phoneDirectoryStream().listen((list) {
-        phoneDirectory = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.telecomNetworksStream().listen((list) {
-        telecomNetworks = list;
-        notifyListeners();
-      }));
-      _subs.add(_firebase.pendingRequestsStream().listen((list) {
-        pendingRequests = list;
-        notifyListeners();
-      }));
-    } catch (e) {
-      debugPrint('Load error: $e');
+      catalog.syncFromDevices(devices);
+    } catch (e, st) {
+      loadError = 'تعذر تحميل بيانات النظام من Supabase. تحقق من الاتصال وصلاحيات الحساب ثم أعد المحاولة.';
+      debugPrint('Supabase load error: $e\n$st');
     } finally {
       isLoading = false;
       notifyListeners();
@@ -138,46 +123,43 @@ class AppProvider extends ChangeNotifier {
   }
 
   void _clearData() {
-    devices = [];
-    custodyCards = [];
-    movements = [];
-    tickets = [];
-    auditLogs = [];
-    phoneDirectory = [];
-    telecomNetworks = [];
-    pendingRequests = [];
+    devices = []; custodyCards = []; movements = []; tickets = [];
+    auditLogs = []; phoneDirectory = []; telecomNetworks = []; networkSwitches = []; pendingRequests = [];
   }
 
-  void setActiveTab(String tab) {
-    activeTab = tab;
-    notifyListeners();
+  Future<void> loginWithEmail(String email, String password) async {
+    isSyncing = true; notifyListeners();
+    try { await _supabase.signInWithEmail(email.trim(), password); }
+    finally { isSyncing = false; notifyListeners(); }
   }
 
   Future<void> loginWithGoogle() async {
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.signInWithGoogle();
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    isSyncing = true; notifyListeners();
+    try { await _supabase.signInWithGoogle(); }
+    finally { isSyncing = false; notifyListeners(); }
   }
 
-  Future<void> logout() async {
-    await _firebase.signOut();
-  }
+  Future<void> logout() => _supabase.signOut();
 
-  // -------------------- CRUD Wrappers --------------------
-
-  Future<String?> saveDevice(Device device) async {
+  Future<String?> _run(Future<void> Function() action, {String success = 'تم إرسال الطلب لرئيس الدائرة للاعتماد'}) async {
     if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
+    isSyncing = true; notifyListeners();
     try {
-      await _firebase.saveDevice(device, currentUser!, isHeadOfDept);
-      await catalog.learnFromDevice(device);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
+      await action();
+      await _loadSettingsAndData();
+      return _isAdmin ? null : success;
+    } on PostgrestException catch (e) {
+      if (e.code == '23505') {
+        final details = '${e.message} ${e.details ?? ''}';
+        if (details.contains('devices_barcode_unique_nonblank_idx')) {
+          return 'خطأ: هذا الباركود مسجل مسبقاً لجهاز آخر.';
+        }
+        if (details.contains('devices_asset_number_unique_nonblank_idx')) {
+          return 'خطأ: رقم الأصل مسجل مسبقاً لجهاز آخر.';
+        }
+        return 'خطأ: توجد قيمة مكررة. تحقق من رقم الجهاز أو السجل قبل الحفظ.';
+      }
+      return 'خطأ: ${e.message}';
     } catch (e) {
       return 'خطأ: $e';
     } finally {
@@ -186,260 +168,133 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> deleteDevice(String id) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    final dev = devices.where((d) => d.id == id).firstOrNull;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.deleteDevice(id, dev?.name ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+  Future<String?> saveDevice(Device d) => _run(() async { await _supabase.saveDevice(d); });
+  Future<String?> deleteDevice(String id) {
+    final d = devices.where((x) => x.id == id).firstOrNull;
+    return _run(() => _supabase.deleteDevice(id, d?.name ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
-
-  Future<String?> saveCustodyCard(CustodyCard card) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.saveCustodyCard(card, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+  Future<String?> saveCustodyCard(CustodyCard c) => _run(() => _supabase.saveCustodyCard(c));
+  Future<String?> deleteCustodyCard(String id) {
+    final c = custodyCards.where((x) => x.id == id).firstOrNull;
+    return _run(() => _supabase.deleteCustodyCard(id, c?.cardNumber ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
-
-  Future<String?> deleteCustodyCard(String id) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    final card = custodyCards.where((c) => c.id == id).firstOrNull;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.deleteCustodyCard(id, card?.cardNumber ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<String?> saveMovement(Movement movement) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.saveMovement(movement, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<String?> saveTicket(MaintenanceTicket ticket) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.saveTicket(ticket, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<String?> deleteTicket(String id) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
+  Future<String?> saveMovement(Movement m) => _run(() => _supabase.saveMovement(m));
+  Future<String?> saveTicket(MaintenanceTicket t) => _run(() => _supabase.saveTicket(t));
+  Future<String?> deleteTicket(String id) {
     final t = tickets.where((x) => x.id == id).firstOrNull;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.deleteTicket(id, t?.ticketNumber ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    return _run(() => _supabase.deleteTicket(id, t?.ticketNumber ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
-
-  Future<String?> savePhoneEntry(PhoneDirectoryEntry entry) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.savePhoneEntry(entry, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<String?> deletePhoneEntry(String id) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
+  Future<String?> savePhoneEntry(PhoneDirectoryEntry e) => _run(() => _supabase.savePhone(e));
+  Future<String?> deletePhoneEntry(String id) {
     final e = phoneDirectory.where((x) => x.id == id).firstOrNull;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.deletePhoneEntry(id, e?.employeeName ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    return _run(() => _supabase.deletePhone(id, e?.employeeName ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
-
-  Future<String?> saveTelecomNetwork(TelecomNetworkInfo network) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.saveTelecomNetwork(network, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال الطلب لرئيس الدائرة للاعتماد';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
-  }
-
-  Future<String?> deleteTelecomNetwork(String id) async {
-    if (currentUser == null) return 'يجب تسجيل الدخول';
+  Future<String?> saveTelecomNetwork(TelecomNetworkInfo n) => _run(() => _supabase.saveNetwork(n));
+  Future<String?> saveNetworkSwitch(Map<String, dynamic> item) => _run(() => _supabase.saveNetworkSwitch(item));
+  Future<String?> deleteNetworkSwitch(String id, String name) => _run(() => _supabase.deleteNetworkSwitch(id, name), success: 'تم إرسال طلب حذف السويتش للاعتماد');
+  Future<String?> deleteTelecomNetwork(String id) {
     final n = telecomNetworks.where((x) => x.id == id).firstOrNull;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.deleteTelecomNetwork(id, n?.name ?? id, currentUser!, isHeadOfDept);
-      return isHeadOfDept ? null : 'تم إرسال طلب الحذف لرئيس الدائرة';
-    } catch (e) {
-      return 'خطأ: $e';
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    return _run(() => _supabase.deleteNetwork(id, n?.name ?? id), success: 'تم إرسال طلب الحذف لرئيس الدائرة');
   }
-
   Future<void> approveRequest(PendingRequest req) async {
-    if (currentUser == null || !isHeadOfDept) return;
-    isSyncing = true;
-    notifyListeners();
-    try {
-      await _firebase.approveRequest(req, currentUser!);
-    } finally {
-      isSyncing = false;
-      notifyListeners();
-    }
+    if (!_isAdmin) throw Exception('صلاحية مدير النظام فقط');
+    await _supabase.approveRequest(req); await _loadSettingsAndData();
   }
-
-  Future<void> rejectRequest(String requestId, String reason) async {
-    if (currentUser == null || !isHeadOfDept) return;
-    isSyncing = true;
-    notifyListeners();
+  Future<void> rejectRequest(String id, String reason) async {
+    if (!_isAdmin) throw Exception('صلاحية مدير النظام فقط');
+    await _supabase.rejectRequest(id, reason); await _loadSettingsAndData();
+  }
+  Future<String?> requestAdminHandover({
+    required String proposedAdminEmail,
+    required String targetProjectRef,
+  }) async {
+    if (!_isAdmin) return 'هذه العملية متاحة لمدير النظام الحالي فقط';
     try {
-      await _firebase.rejectRequest(requestId, reason, currentUser!);
-    } finally {
-      isSyncing = false;
-      notifyListeners();
+      return await _supabase.requestAdminHandover(
+        proposedAdminEmail: proposedAdminEmail,
+        targetProjectRef: targetProjectRef,
+      );
+    } catch (e) {
+      return 'تعذر إنشاء طلب التسليم: $e';
     }
   }
 
   Future<void> updateHeadEmail(String email) async {
-    if (!isHeadOfDept) return;
-    await _firebase.updateHeadEmail(email);
-    headEmail = email;
-    notifyListeners();
+    throw UnsupportedError('تعيين مدير النظام يتم من صلاحيات Supabase وليس بتغيير البريد من التطبيق.');
   }
-
-  @override
-  void dispose() {
-    for (final s in _subs) {
-      s.cancel();
-    }
-    super.dispose();
-  }
-
-
-  // -------------------- تصدير / استيراد --------------------
-
-  final ExcelService _excel = ExcelService();
-  final SheetsService _sheets = SheetsService();
 
   Future<String?> exportDevicesExcel() async {
-    try {
-      return await _excel.exportDevices(devices);
-    } catch (e) {
-      return 'خطأ التصدير: $e';
-    }
+    try { return await _excel.exportDevices(devices); } catch (e) { return 'خطأ التصدير: $e'; }
   }
-
   Future<String?> exportCustodyExcel() async {
-    try {
-      return await _excel.exportCustodyCards(custodyCards);
-    } catch (e) {
-      return 'خطأ التصدير: $e';
-    }
+    try { return await _excel.exportCustodyCards(custodyCards); } catch (e) { return 'خطأ التصدير: $e'; }
   }
-
   Future<String?> exportFullExcel() async {
+    try { return await _excel.exportFullReport(devices: devices, cards: custodyCards, movements: movements, tickets: tickets, phones: phoneDirectory, networks: telecomNetworks); }
+    catch (e) { return 'خطأ التصدير: $e'; }
+  }
+  Future<ImportResult<Device>> importDevicesExcel() => _excel.importDevicesFromFile();
+  Future<ImportResult<CustodyCard>> importCustodyExcel() => _excel.importCustodyCardsFromFile();
+
+  /// Imports records one by one, reports partial failures, and refreshes once.
+  /// Non-admin users create approval requests rather than writing operational rows.
+  Future<String> importDevices(List<Device> items) =>
+      _importRecords<Device>(items, _supabase.saveDevice);
+
+  Future<String> importCustodyCards(List<CustodyCard> items) =>
+      _importRecords<CustodyCard>(items, _supabase.saveCustodyCard);
+
+  Future<String> _importRecords<T>(
+    List<T> items,
+    Future<void> Function(T item) save,
+  ) async {
+    if (currentUser == null) return 'يجب تسجيل الدخول قبل الاستيراد.';
+    if (items.isEmpty) return 'لا توجد سجلات صالحة للاستيراد.';
+    if (isSyncing) return 'هناك عملية أخرى قيد التنفيذ؛ حاول بعد انتهائها.';
+
+    final wasAdmin = _isAdmin;
+    var succeeded = 0;
+    final failures = <String>[];
+    isSyncing = true;
+    notifyListeners();
     try {
-      return await _excel.exportFullReport(
-        devices: devices,
-        cards: custodyCards,
-        movements: movements,
-        tickets: tickets,
-        phones: phoneDirectory,
-        networks: telecomNetworks,
-      );
-    } catch (e) {
-      return 'خطأ التصدير: $e';
+      for (var i = 0; i < items.length; i++) {
+        try {
+          await save(items[i]);
+          succeeded++;
+        } catch (e) {
+          failures.add('السجل ${i + 1}: $e');
+        }
+      }
+      if (succeeded > 0) {
+        await _loadSettingsAndData();
+      }
+      final result = wasAdmin
+          ? 'تم حفظ $succeeded من أصل ${items.length} سجل.'
+          : 'تم إرسال $succeeded من أصل ${items.length} طلباً للاعتماد؛ لم تُضف السجلات مباشرة.';
+      if (failures.isEmpty) return result;
+      final details = failures.take(3).join('؛ ');
+      final remaining = failures.length > 3 ? '؛ وأخطاء أخرى (${failures.length - 3})' : '';
+      return '$result فشل ${failures.length}. $details$remaining';
+    } finally {
+      isSyncing = false;
+      notifyListeners();
     }
   }
 
-  Future<ImportResult<Device>> importDevicesExcel() async {
-    return _excel.importDevicesFromFile();
-  }
+  Future<SheetsExportResult> exportToGoogleSheets() => _sheets.exportInventoryToGoogleSheets(
+    title: 'جرد الأصول والعهدة - دائرة الاتصالات',
+    devices: devices,
+    custodyCards: custodyCards,
+  );
 
-  Future<ImportResult<CustodyCard>> importCustodyExcel() async {
-    return _excel.importCustodyCardsFromFile();
-  }
+  Future<SheetsExportResult> exportFullToGoogleSheets() => _sheets.exportFullReportToSheets(
+    devices: devices,
+    cards: custodyCards,
+    movements: movements,
+    tickets: tickets,
+  );
 
-  Future<SheetsExportResult> exportToGoogleSheets() async {
-    return _sheets.exportInventoryToGoogleSheets(
-      title: 'جرد الأصول والعهدة - دائرة الاتصالات',
-      devices: devices,
-      custodyCards: custodyCards,
-    );
-  }
-
-  Future<SheetsExportResult> exportFullToGoogleSheets() async {
-    return _sheets.exportFullReportToSheets(
-      devices: devices,
-      cards: custodyCards,
-      movements: movements,
-      tickets: tickets,
-    );
-  }
-
+  @override
+  void dispose() { _authSubscription?.cancel(); super.dispose(); }
 }

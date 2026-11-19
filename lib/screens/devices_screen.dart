@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -38,6 +39,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
           d.name.toLowerCase().contains(q) ||
           d.serialNumber.toLowerCase().contains(q) ||
           d.barcode.toLowerCase().contains(q) ||
+          d.assetNumber.toLowerCase().contains(q) ||
+          d.location.toLowerCase().contains(q) ||
           d.model.toLowerCase().contains(q) ||
           d.manufacturer.toLowerCase().contains(q)).toList();
     }
@@ -130,7 +133,12 @@ class _DevicesScreenState extends State<DevicesScreen> {
                           leading: SectionIcon(icon: AppIcons.category(d.category), color: catColor, size: 42),
                           title: Text(d.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           subtitle: Text(
-                            '${d.serialNumber}${d.manufacturer.isNotEmpty ? ' • ${d.manufacturer}' : ''}',
+                            [
+                              d.serialNumber,
+                              if (d.assetNumber.isNotEmpty) 'الأصل: ${d.assetNumber}',
+                              if (d.barcode.isNotEmpty) 'باركود: ${d.barcode}',
+                              if (d.manufacturer.isNotEmpty) d.manufacturer,
+                            ].join(' • '),
                             style: const TextStyle(fontSize: 11),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -319,7 +327,50 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   const SizedBox(height: 10),
                   TextField(controller: serialCtrl, decoration: const InputDecoration(labelText: 'الرقم التسلسلي *')),
                   const SizedBox(height: 10),
-                  TextField(controller: barcodeCtrl, decoration: const InputDecoration(labelText: 'الباركود / QR')),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: barcodeCtrl,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'الباركود / QR',
+                            helperText: 'يدعم قارئ USB الذي يعمل كلوحة مفاتيح؛ امسح الرمز والمؤشر داخل الحقل.',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: 'مسح بالكاميرا',
+                        icon: const Icon(Icons.qr_code_scanner),
+                        onPressed: () async {
+                          final scanned = await showModalBottomSheet<String>(
+                            context: ctx,
+                            isScrollControlled: true,
+                            builder: (scanContext) => SizedBox(
+                              height: MediaQuery.of(scanContext).size.height * 0.72,
+                              child: MobileScanner(
+                                onDetect: (capture) {
+                                  final values = capture.barcodes
+                                      .map((barcode) => barcode.rawValue)
+                                      .whereType<String>()
+                                      .where((value) => value.isNotEmpty);
+                                  if (values.isNotEmpty && scanContext.mounted) {
+                                    Navigator.of(scanContext).pop(values.first);
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                          if (scanned != null) {
+                            setModalState(() => barcodeCtrl.text = scanned);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   TextField(controller: assetCtrl, decoration: const InputDecoration(labelText: 'رقم الأصل / العهدة')),
                   const SizedBox(height: 10),
@@ -380,12 +431,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         assignedEmployee: existing?.assignedEmployee,
                       );
                       final msg = await app.saveDevice(device);
-                      if (context.mounted) {
-                        Navigator.pop(context);
+                      if (!context.mounted) return;
+                      final failed = msg != null &&
+                          (msg.startsWith('خطأ:') || msg == 'يجب تسجيل الدخول');
+                      if (failed) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(msg ?? 'تم الحفظ بنجاح')),
+                          SnackBar(
+                            content: Text(msg),
+                            backgroundColor: AppTheme.danger,
+                          ),
                         );
+                        return;
                       }
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(msg ?? 'تم الحفظ بنجاح')),
+                      );
                     },
                     child: const Text('حفظ'),
                   ),
@@ -396,7 +457,17 @@ class _DevicesScreenState extends State<DevicesScreen> {
           ),
         ),
       ),
-    );
+    ).whenComplete(() {
+      nameCtrl.dispose();
+      manufacturerCtrl.dispose();
+      modelCtrl.dispose();
+      serialCtrl.dispose();
+      barcodeCtrl.dispose();
+      assetCtrl.dispose();
+      locationCtrl.dispose();
+      supplierCtrl.dispose();
+      notesCtrl.dispose();
+    });
   }
 }
 
@@ -422,25 +493,6 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
-    );
-  }
-}
-
 
 /// حقل إدخال مع اقتراحات من الكتالوج (موديل / شركة)
 class _SuggestField extends StatefulWidget {

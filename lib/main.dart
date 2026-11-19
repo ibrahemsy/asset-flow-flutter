@@ -1,40 +1,18 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'firebase_options.dart';
 import 'providers/app_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
-import 'services/backend_config.dart';
 import 'services/supabase_service.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تحميل إعدادات الخلفية (Firebase / Supabase)
-  final backend = BackendConfig();
-  await backend.load();
-
-  // Firebase دائماً متاح كخيار افتراضي
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint('Firebase init: $e');
-  }
-
-  // تهيئة Supabase إن كان مفعّلاً ومضبوطاً
-  if (backend.isSupabase && backend.supabaseConfigured) {
-    try {
-      await SupabaseService.initialize();
-    } catch (e) {
-      debugPrint('Supabase init: $e');
-    }
-  }
+  // Supabase هو مزود الخلفية الوحيد.
+  await SupabaseService.initialize();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

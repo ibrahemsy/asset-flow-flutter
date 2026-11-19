@@ -1,334 +1,131 @@
-# تجهيز المشروع للتشغيل — دائرة الاتصالات
+# تشغيل نظام إدارة الأصول والعهدة
 
-## 1) المتطلبات
-- Flutter SDK 3.16+
-- حساب Google Cloud / Firebase
-- (اختياري) مشروع Supabase
+## المتطلبات
+- Flutter SDK (الإصدار المستقر المستخدم في CI).
+- مشروع Supabase المرتبط بالتطبيق.
+- Android SDK لبناء APK؛ لا يلزم إعداد Firebase.
+
+## إعداد Supabase
+
+المشروع مهيأ افتراضياً على مشروع Supabase المرتبط بالمستودع. عنوان المشروع والمفتاح العام publishable key موجودان كقيم افتراضية عامة داخل خدمة التهيئة، ويمكن تجاوزهما عند البناء:
 
 ```bash
-cd asset_flow_flutter
 flutter pub get
+flutter run \
+  --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 ```
 
----
+لا تضع مفتاح `service_role` في تطبيق Flutter أو GitHub؛ التطبيق يستخدم المفتاح العام فقط، والحماية تعتمد على RLS.
 
-## 2) Firebase (إلزامي للوضع الافتراضي)
+### إعداد أول مدير
+1. أنشئ مستخدم المدير في Supabase → Authentication → Users.
+2. تحقق من البريد ومعرّف Auth UID.
+3. عيّن الدور `primary_admin` لذلك المعرّف في `private.admin_assignments` من SQL Editor بصلاحيات مالك المشروع.
+4. لا تستخدم كلمة مرور افتراضية أو تضعها في المستودع.
 
-### أ. إنشاء المشروع
-1. افتح [Firebase Console](https://console.firebase.google.com)
-2. مشروع جديد (مثلاً `asset-flow-telecom`)
-3. أضف تطبيق **Android** / **iOS** / **Web** حسب الحاجة
+لا ينشئ التطبيق مديراً تلقائياً ولا يسمح للمستخدم بمنح نفسه صلاحيات مدير. راجع `docs/SUPABASE_DATABASE_ACCESS.md` وملفات `supabase/migrations/`.
 
-### ب. Authentication
-- Authentication → Sign-in method → فعّل **Google**
-- أضف البريد التجريبي إن لزم
+## منصات التشغيل والبناء
 
-### ج. Firestore
-- أنشئ قاعدة Firestore (وضع production أو test مؤقتاً)
-- هيكل مقترح (ينشئه التطبيق تلقائياً):
-  - `department_data/telecom/devices`
-  - `custody_cards` / `movements` / `maintenance_tickets` / …
-  - `pending_requests` / `audit_logs` / `system_settings`
-
-### د. إعداد FlutterFire
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-يستبدل `lib/firebase_options.dart` بالقيم الحقيقية.
-
-### هـ. Android — Google Sign-In
-- من Firebase: نزّل `google-services.json` → `android/app/`
-- SHA-1 للتطوير:
-```bash
-cd android && ./gradlew signingReport
-```
-أضف SHA-1 في إعدادات تطبيق Android في Firebase.
-
-### و. قواعد Firestore (مثال مبدئي)
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
-لاحقاً قيّد الكتابة حسب الدور (مدير النظام).
-
----
-
-## 3) Google Sheets (مهم)
-
-التطبيق يطلب صلاحية:
-`https://www.googleapis.com/auth/spreadsheets`
-
-### أ. Google Cloud Console
-1. نفس مشروع Firebase أو مشروع مرتبط
-2. **APIs & Services → Enable APIs** → فعّل **Google Sheets API**
-3. **OAuth consent screen**:
-   - نوع External أو Internal (Workspace)
-   - أضف نطاق: `.../auth/spreadsheets` و `email` و `profile`
-   - أضف مستخدمين تجريبيين أثناء التطوير
-4. **Credentials**: OAuth 2.0 Client (Android/iOS/Web) متوافق مع Firebase
-
-### ب. من داخل التطبيق
-1. سجّل الدخول بـ **Google** (من شاشة الدخول)
-2. عند أول تصدير لـ Sheets قد يُطلب الموافقة على الصلاحية
-3. التقارير → **تصدير الجرد إلى Google Sheets** أو **تقرير شامل**
-4. يُنشأ جدول جديد في حسابك ويُفتح الرابط
-
-### ج. استكشاف الأخطاء
-| المشكلة | الحل |
-|---------|------|
-| فشل إنشاء الجدول | تأكد من تفعيل Sheets API |
-| لا يوجد access token | اخرج وادخل من جديد واقبل صلاحية Sheets |
-| 403 | أضف الحساب كمستخدم تجريبي في OAuth consent |
-| Android | تحقق SHA-1 و `google-services.json` |
-
----
-
-## 4) Supabase (اختياري)
-1. أنشئ مشروعاً على supabase.com
-2. نفّذ ملف `supabase_schema.sql` من SQL Editor
-3. من التطبيق (مدير النظام فقط): الإدارة → اختر Supabase → الصق URL و Anon Key → حفظ
-4. أعد تشغيل التطبيق
-
----
-
-## 5) مدير النظام
-البريد الافتراضي لرئيس دائرة الاتصالات / مدير النظام:
-- `ferasnatof@gmail.com`
-- `gfa437926@gmail.com`
-
-يمكن إضافة بريد آخر من شاشة **الإدارة**.
-
----
-
-## 6) التشغيل
-```bash
-flutter run
-# أو
-flutter build apk
-flutter build web
-```
-
----
-
-## 7) مسار الاستخدام اليومي
-1. دخول Google
-2. إضافة أجهزة (الموديل يُحفظ للاقتراحات)
-3. بطاقات عهدة + رقم وطني + صور
-4. الفنيون يرسلون طلبات → المدير يعتمد
-5. التقارير → Excel أو Google Sheets للجرد
-'''
-Path('/home/workdir/artifacts/asset_flow_flutter/SETUP.md').write_text(open('/home/workdir/artifacts/asset_flow_flutter/SETUP.md').read() if False else '''# تجهيز المشروع للتشغيل — دائرة الاتصالات
-
-## 1) المتطلبات
-- Flutter SDK 3.16+
-- حساب Google Cloud / Firebase
-- (اختياري) مشروع Supabase
+ملفات Android وWeb موجودة في المستودع:
 
 ```bash
-cd asset_flow_flutter
 flutter pub get
+flutter analyze --no-pub --no-fatal-infos
+flutter test --no-pub
+flutter build web --release
+flutter build apk --release
 ```
 
----
+- الويب: `build/web/`
+- Android APK: `build/app/outputs/flutter-apk/app-release.apk` (للتثبيت المباشر).
+- Android App Bundle: `build/app/outputs/bundle/release/app-release.aab` (صيغة Google Play).
+- لا ترفع APK/AAB إلى المتجر قبل التأكد من أن البناء موقّع بمفتاح الإصدار الخاص بمالك التطبيق. إذا لم تُضف أسرار التوقيع إلى GitHub Actions فالناتج مخصص للاختبار فقط.
+- iOS: يخرج CI نسخة `Runner.app` غير موقّعة للتحقق والبناء؛ التوزيع الفعلي يتطلب Apple Developer Team وشهادة توزيع وملف Provisioning Profile ثم إنشاء IPA موقّع.
 
-## 2) Firebase (إلزامي للوضع الافتراضي)
+## قارئ الباركود
+- USB: استخدم قارئاً يعمل بوضع Keyboard Wedge، ثم ضع المؤشر في حقل الباركود وامسح الرمز.
+- كاميرا الهاتف: اضغط زر مسح الكاميرا بجانب حقل الباركود وامنح إذن الكاميرا.
 
-### أ. إنشاء المشروع
-1. افتح [Firebase Console](https://console.firebase.google.com)
-2. مشروع جديد (مثلاً `asset-flow-telecom`)
-3. أضف تطبيق **Android** / **iOS** / **Web** حسب الحاجة
+## التصدير
+- تصدير Excel مدعوم.
+- تصدير Google Sheets متوقف مؤقتاً إلى أن تتم إضافة تكامل Google OAuth مستقل عن Firebase.
 
-### ب. Authentication
-- Authentication → Sign-in method → فعّل **Google**
+## ملاحظات التسليم
+- التطوير يتم على فرع `feature/supabase-admin-handover`.
+- لا تدمج PR #2 إلى `main` قبل مراجعة المالك وموافقته.
+- لم يتم تنفيذ نقل بيانات أو صلاحيات إلى مدير جديد؛ عملية التسليم تتطلب تحديد حساب الوجهة والتحقق منه أولاً.
 
-### ج. Firestore
-- أنشئ قاعدة Firestore
-- المجموعات تُنشأ تلقائياً عند أول حفظ
 
-### د. إعداد FlutterFire
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-يستبدل `lib/firebase_options.dart` بالقيم الحقيقية.
+## توقيع Android للإنتاج
 
-### هـ. Android — Google Sign-In
-- نزّل `google-services.json` → `android/app/`
-```bash
-cd android && ./gradlew signingReport
-```
-أضف SHA-1 في Firebase.
+البناء الآلي الحالي يستخدم توقيع debug إذا لم يُجهّز المالك مفتاح نشر. لتفعيل توقيع الإصدار:
 
-### و. قواعد Firestore (تطوير)
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
+1. أنشئ keystore خاصاً بالمالك على جهاز آمن باستخدام الأمر التالي (غيّر alias إذا رغبت، ولا تستخدم كلمة مرور ضعيفة):
+   ```bash
+   keytool -genkeypair -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+   احفظ كلمات المرور واسم alias؛ ستحتاجها عند إعداد أسرار GitHub.
+2. لا ترفع keystore أو كلمات المرور إلى Git ولا ترسلها في المحادثة.
+3. أضف القيم التالية في إعدادات المستودع → Settings → Secrets and variables → Actions:
+   - `ANDROID_KEYSTORE_BASE64`: محتوى keystore بعد تحويله إلى Base64.
+   - `ANDROID_STORE_PASSWORD`: كلمة مرور keystore.
+   - `ANDROID_KEY_ALIAS`: اسم المفتاح.
+   - `ANDROID_KEY_PASSWORD`: كلمة مرور المفتاح.
+   لتحويل الملف إلى Base64 على Windows PowerShell (نفّذ الأمر من المجلد الذي يحتوي الملف):
+   ```powershell
+   [Convert]::ToBase64String([IO.File]::ReadAllBytes("upload-keystore.jks")) | Set-Clipboard
+   ```
+   وعلى Linux/macOS:
+   ```bash
+   base64 -w 0 upload-keystore.jks
+   ```
+4. سيجهز GitHub Actions ملف التوقيع مؤقتاً أثناء البناء، ثم يستخدم توقيع المالك تلقائياً.
+5. احتفظ بالمفتاح وكلمات المرور بأمان؛ فقدان مفتاح التوقيع قد يمنع تحديث التطبيق المنشور بنفس هوية الحزمة.
 
----
+إذا لم تُضف الأسرار، يبقى APK الناتج مخصصاً للاختبار وليس للنشر في المتجر.
 
-## 3) Google Sheets
 
-الصلاحية المستخدمة: `https://www.googleapis.com/auth/spreadsheets`
+### توقيع iOS
+بناء iOS الموجود في CI غير موقع (no-codesign) ولا يمكن تثبيته أو توزيعه كنسخة إنتاجية قبل إعداد Apple Developer signing. يتطلب ذلك حساب Apple Developer، وApple Distribution certificate، وProvisioning Profile، وTeam ID، ثم إعداد أسرار GitHub Actions المناسبة. لا ترفع ملفات الشهادة أو كلمات مرورها إلى Git.
 
-### Google Cloud
-1. فعّل **Google Sheets API**
-2. شاشة موافقة OAuth + نطاق spreadsheets
-3. أضف مستخدمين تجريبيين أثناء التطوير
+## نتيجة بناء التحقق الأخيرة (16 نوفمبر 2026)
 
-### من التطبيق
-1. دخول بحساب Google
-2. التقارير → «تصدير الجرد إلى Google Sheets» أو «تقرير شامل»
-3. يُنشأ جدول جديد ويظهر زر «فتح الجدول»
+تم التحقق من commit `3fa8e76e091ffdf9263d19330d6ecd837ba6320b` عبر [GitHub Actions run #249](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43775661458)، وكانت المهام التالية ناجحة:
+- Flutter static analysis وUnit/Widget tests.
+- Web release build.
+- Android APK وAndroid App Bundle.
+- iOS unsigned app build ورفع مشروع iOS الناتج.
 
-| مشكلة | حل |
-|--------|-----|
-| فشل الإنشاء | تفعيل Sheets API |
-| لا token | إعادة الدخول وقبول الصلاحية |
-| 403 | مستخدم تجريبي في OAuth |
-| Android | SHA-1 + google-services.json |
+أسماء مخرجات التشغيل:
+- `asset-flow-web`
+- `asset-flow-android-apk-testing-only`
+- `asset-flow-android-aab-testing-only`
+- `asset-flow-ios-unsigned-app`
+- `asset-flow-ios-project`
 
----
+**تنبيه توقيع موثق:** لم تكن أسرار توقيع المالك مضافة إلى هذا التشغيل؛ لذلك صنّف CI مخرجات Android صراحةً على أنها `testing-only`. كما أن iOS مخرج غير موقّع. نجاح البناء والاختبارات لا يعني أن التطبيق اجتاز اختبار أجهزة فعلية أو أصبح جاهزاً للنشر في المتاجر. لا تستخدم هذه الملفات كإصدار إنتاجي.
 
-## 4) Supabase (اختياري)
-1. نفّذ `supabase_schema.sql`
-2. الإدارة → Supabase → URL + Anon Key → حفظ → أعد التشغيل
+مخرجات GitHub Actions محفوظة وفق مدة الاحتفاظ الافتراضية للـ artifacts، وقد تنتهي صلاحية روابط التنزيل؛ أنشئ إصداراً جديداً عند الحاجة إلى ملفات حديثة.
 
----
+### تدقيق إزالة Firebase وتوقيع CI (16 نوفمبر 2026)
+- لا توجد حزم Firebase مباشرة في `pubspec.yaml` ولا حزم Firebase Auth/Database/Firestore في كود التطبيق.
+- يحتوي APK على مكتبات Android أصلية مساعدة بأسماء `firebase-components` و`firebase-encoders` مصدرها سلسلة تبعيات Google ML Kit المستخدمة في مسح الباركود. هذه المكتبات لا تعني أن التطبيق يستخدم Firebase كخلفية أو مصادقة؛ الخلفية الفعلية هي Supabase. لم أحذفها لأن ذلك قد يعطل قارئ الباركود.
+- تم تشديد شروط GitHub Actions: لا تُسمّى مخرجات Android بأنها موقّعة إنتاجياً إلا إذا كانت أسرار التوقيع الأربعة كلها موجودة (Base64 keystore وكلمتا المرور واسم alias). إذا نقص أي سر، تُصنّف المخرجات Testing only.
+- لم تُضف أسرار توقيع المالك إلى المستودع أو المحادثة.
+- أضيف إلى CI فحص وقائي يرفض أي مرجع إلى Firebase SDK أو ملفات Firebase القديمة داخل `lib/` أو `pubspec.yaml`؛ لا يمنع ذلك مكتبات Google الأصلية الانتقالية التي قد يعتمد عليها ماسح الباركود.
 
-## 5) مدير النظام
-- `ferasnatof@gmail.com`
-- `gfa437926@gmail.com`
-(قابل للإضافة من شاشة الإدارة)
 
----
+## أحدث تحقق آلي — 16 نوفمبر 2026 (CI #256)
 
-## 6) التشغيل
-```bash
-flutter run
-flutter build apk
-```
-''')
-print('SETUP written')
-PY
-# fix - the write was messy, write cleanly
-cat > /home/workdir/artifacts/asset_flow_flutter/SETUP.md << 'EOF'
-# تجهيز المشروع للتشغيل — دائرة الاتصالات
+تم التحقق من commit `070a221c16120cfa3d5cc1bfd28fe9596f4b0211` عبر [GitHub Actions run #256](https://github.com/ibrahemsy/asset-flow-flutter/actions/runs/43831436946). نجحت مهمتا `analyze-and-test` و`build-ios-unsigned` بالكامل، بما يشمل تحليل Flutter والاختبارات وبناء Web وAndroid APK/AAB وiOS.
 
-## 1) المتطلبات
-- Flutter SDK 3.16+
-- حساب Google Cloud / Firebase
-- (اختياري) مشروع Supabase
+المخرجات الحالية:
+- `asset-flow-web`
+- `asset-flow-android-apk-testing-only`
+- `asset-flow-android-aab-testing-only`
+- `asset-flow-ios-unsigned-app`
+- `asset-flow-ios-project`
 
-```bash
-cd asset_flow_flutter
-flutter pub get
-```
-
----
-
-## 2) Firebase (الوضع الافتراضي)
-
-1. أنشئ مشروعاً في [Firebase Console](https://console.firebase.google.com)
-2. Authentication → فعّل **Google**
-3. أنشئ **Firestore Database**
-4. اربط Flutter:
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-5. Android: ضع `google-services.json` في `android/app/` وأضف **SHA-1**:
-```bash
-cd android && ./gradlew signingReport
-```
-
-قواعد تطوير مؤقتة:
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
-
----
-
-## 3) Google Sheets (مهم)
-
-الصلاحية: `https://www.googleapis.com/auth/spreadsheets`
-
-### في Google Cloud (نفس مشروع Firebase غالباً)
-1. **Enable API** → Google Sheets API
-2. **OAuth consent screen** → أضف النطاق أعلاه + email/profile
-3. أضف حسابات تجريبية أثناء التطوير
-4. تأكد من OAuth Client متوافق مع منصة التشغيل (Android/iOS/Web)
-
-### في التطبيق
-1. سجّل الدخول بـ Google من شاشة الدخول
-2. افتح **التقارير**
-3. اختر:
-   - **تصدير الجرد إلى Google Sheets** (أجهزة + عهدة)
-   - **تقرير شامل على Google Sheets** (أجهزة + عهدة + حركات + صيانة)
-4. بعد النجاح: زر **فتح الجدول** في المتصفح
-
-### أعطال شائعة
-| المشكلة | الحل |
-|---------|------|
-| فشل إنشاء الجدول | تفعيل Sheets API |
-| لا يوجد access token | خروج ودخول وقبول صلاحية Sheets |
-| 403 | إضافة المستخدم في OAuth test users |
-| Android | SHA-1 + google-services.json |
-
----
-
-## 4) Supabase (اختياري)
-1. نفّذ `supabase_schema.sql` في SQL Editor
-2. من التطبيق (مدير النظام): الإدارة → Supabase → URL + Anon Key → حفظ
-3. أعد تشغيل التطبيق
-
----
-
-## 5) مدير النظام (رئيس دائرة الاتصالات)
-- ferasnatof@gmail.com
-- gfa437926@gmail.com
-
-إضافة بريد آخر من شاشة **الإدارة**.
-
----
-
-## 6) التشغيل
-```bash
-flutter run
-# أو
-flutter build apk
-```
-
-## 7) الاستخدام اليومي
-1. دخول Google  
-2. إضافة أجهزة (الموديل يُقترح لاحقاً)  
-3. بطاقات عهدة + رقم وطني + صور  
-4. الفني يطلب → المدير يعتمد  
-5. التقارير → Excel أو Google Sheets  
-EOF
-echo OK
-ls -la /home/workdir/artifacts/asset_flow_flutter/SETUP.md
-# Verify provider still valid
-grep -n "exportFullExcel\|exportToGoogleSheets\|ImportResult" /home/workdir/artifacts/asset_flow_flutter/lib/providers/app_provider.dart | head -15
-# Check duplicate class closing
-tail -30 /home/workdir/artifacts/asset_flow_flutter/lib/providers/app_provider.dart
+مخرجات Android الحالية ما زالت Testing only لأن أسرار توقيع المالك غير مهيأة في GitHub Actions. ومخرج iOS غير موقّع. لذلك هذا تحقق بناء ناجح وليس إصداراً إنتاجياً قابلاً للنشر في المتاجر. يتطلب الإطلاق توقيع Android بمفتاح المالك، وتوقيع iOS بحساب Apple Developer وشهادة توزيع وملف Provisioning Profile، ثم اختبارات قبول على أجهزة فعلية.

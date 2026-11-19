@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
-import '../services/backend_config.dart';
-import '../services/supabase_service.dart';
 import '../utils/app_theme.dart';
 import '../utils/app_icons.dart';
 
@@ -15,28 +13,50 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> {
-  final _cfg = BackendConfig();
-  final _urlCtrl = TextEditingController();
-  final _keyCtrl = TextEditingController();
-  bool _busy = false;
-  String? _msg;
-  bool _msgErr = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _cfg.load().then((_) {
-      _urlCtrl.text = _cfg.supabaseUrl;
-      _keyCtrl.text = _cfg.supabaseAnonKey;
-      if (mounted) setState(() {});
-    });
-  }
+  final _newAdminEmailController = TextEditingController();
+  final _targetProjectController = TextEditingController();
+  bool _submittingHandover = false;
+  String? _handoverMessage;
 
   @override
   void dispose() {
-    _urlCtrl.dispose();
-    _keyCtrl.dispose();
+    _newAdminEmailController.dispose();
+    _targetProjectController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submitHandover(AppProvider app) async {
+    final email = _newAdminEmailController.text.trim();
+    final targetRef = _targetProjectController.text.trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد طلب تسليم الإدارة'),
+        content: Text(
+          'سيُنشأ طلب تسليم للمدير $email إلى مشروع Supabase $targetRef. '
+          'هذا الإجراء لا ينقل البيانات تلقائياً ولا يلغي صلاحية المدير الحالي.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('إنشاء الطلب')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() { _submittingHandover = true; _handoverMessage = null; });
+    final result = await app.requestAdminHandover(
+      proposedAdminEmail: email,
+      targetProjectRef: targetRef,
+    );
+    if (!mounted) return;
+    setState(() {
+      _submittingHandover = false;
+      _handoverMessage = result == null
+          ? 'لم يتم إنشاء الطلب. تحقق من صلاحياتك.'
+          : result.startsWith('تعذر') || result.startsWith('هذه')
+              ? result
+              : 'تم إنشاء طلب التسليم بنجاح. رقم الطلب: $result — بانتظار قبول المدير الجديد.';
+    });
   }
 
   @override
@@ -73,150 +93,104 @@ class _UsersScreenState extends State<UsersScreen> {
           ]),
           const SizedBox(height: 20),
 
-          // ---- الخلفية ----
-          const Text('خلفية البيانات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.storage_rounded, color: AppTheme.primary),
+              title: const Text('قاعدة البيانات'),
+              subtitle: const Text('Supabase فقط — المصادقة والبيانات والصلاحيات تُدار من مشروع Supabase المرتبط.'),
+            ),
+          ),
+
+          const SizedBox(height: 16),
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                SegmentedButton<BackendType>(
-                  segments: const [
-                    ButtonSegment(value: BackendType.firebase, label: Text('Firebase'), icon: Icon(Icons.local_fire_department_rounded, size: 18)),
-                    ButtonSegment(value: BackendType.supabase, label: Text('Supabase'), icon: Icon(Icons.storage_rounded, size: 18)),
-                  ],
-                  selected: {_cfg.type},
-                  onSelectionChanged: (s) async {
-                    setState(() => _busy = true);
-                    await _cfg.setBackend(s.first);
-                    setState(() {
-                      _busy = false;
-                      _msg = 'تم تغيير الخلفية إلى ${s.first == BackendType.supabase ? "Supabase" : "Firebase"}. أعد تشغيل التطبيق لتطبيق التغيير بالكامل.';
-                      _msgErr = false;
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                if (_cfg.isSupabase) ...[
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(children: [
+                    Icon(Icons.swap_horiz_rounded, color: AppTheme.primary),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('تسليم الإدارة إلى مشروع Supabase جديد',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                  ]),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'المدير الحالي هو من يحدد المشروع الوجهة. أدخل بريد المدير الجديد ومعرّف مشروعه (Project Ref) المكوّن من 20 حرفاً/رقماً. يمكن إدخال بريد المدير الجديد حتى لو لم يكن مسجلاً بعد في المشروع الحالي؛ تُستكمل مطابقة الحساب عند مرحلة القبول.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.5),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
-                    controller: _urlCtrl,
+                    controller: _newAdminEmailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      labelText: 'Supabase URL',
-                      hintText: 'https://xxxx.supabase.co',
-                      prefixIcon: Icon(Icons.link_rounded),
+                      labelText: 'بريد المدير الجديد',
+                      hintText: 'admin@example.com',
+                      prefixIcon: Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    controller: _keyCtrl,
+                    controller: _targetProjectController,
+                    textCapitalization: TextCapitalization.none,
+                    autocorrect: false,
                     decoration: const InputDecoration(
-                      labelText: 'Anon Key',
-                      prefixIcon: Icon(Icons.key_rounded),
+                      labelText: 'معرّف مشروع Supabase الجديد',
+                      hintText: 'xxxxxxxxxxxxxxxxxxxx',
+                      prefixIcon: Icon(Icons.storage_outlined),
+                      border: OutlineInputBorder(),
                     ),
-                    obscureText: true,
                   ),
                   const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _busy ? null : () async {
-                      setState(() => _busy = true);
-                      try {
-                        await _cfg.setSupabaseCredentials(url: _urlCtrl.text, anonKey: _keyCtrl.text);
-                        await SupabaseService.initialize();
-                        setState(() {
-                          _msg = 'تم حفظ إعدادات Supabase والتهيئة بنجاح';
-                          _msgErr = false;
-                        });
-                      } catch (e) {
-                        setState(() {
-                          _msg = 'خطأ: $e';
-                          _msgErr = true;
-                        });
-                      } finally {
-                        setState(() => _busy = false);
-                      }
-                    },
-                    icon: const Icon(Icons.save_rounded),
-                    label: const Text('حفظ وتهيئة Supabase'),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _submittingHandover ? null : () => _submitHandover(app),
+                      icon: _submittingHandover
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.send_rounded),
+                      label: Text(_submittingHandover ? 'جارٍ إنشاء الطلب...' : 'إنشاء طلب تسليم الإدارة'),
+                    ),
                   ),
-                ] else
+                  if (_handoverMessage != null) ...[
+                    const SizedBox(height: 10),
+                    SelectableText(_handoverMessage!, style: const TextStyle(fontSize: 12)),
+                  ],
+                  const SizedBox(height: 6),
                   const Text(
-                    'الوضع الحالي: Firebase (Auth + Firestore)',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    'تنبيه أمني: إدخال المعرّف ينشئ طلباً موثقاً فقط. نقل الجداول والبيانات وملفات Storage وحسابات Auth يحتاج مرحلة ترحيل مستقلة والتحقق من الوجهة؛ لا تُحذف بيانات المصدر ولا تتغير صلاحيات المدير تلقائياً.',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textSecondary, height: 1.45),
                   ),
-              ]),
+                ],
+              ),
             ),
           ),
-
-          if (_msg != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _msgErr ? const Color(0xFFFEE2E2) : const Color(0xFFD1FAE5),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(_msg!, style: TextStyle(color: _msgErr ? AppTheme.danger : const Color(0xFF065F46), fontSize: 13)),
-            ),
-          ],
 
           const SizedBox(height: 20),
-          // ---- مديرو النظام ----
-          Row(children: [
-            const Text('مديرو النظام', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () => _addAdmin(context),
-              icon: const Icon(Icons.person_add_rounded, size: 18),
-              label: const Text('إضافة'),
-            ),
-          ]),
-          const SizedBox(height: 4),
-          const Text(
-            'رئيس دائرة الاتصالات = مدير النظام (اعتماد الطلبات + الكتابة المباشرة + الإعدادات)',
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          ..._cfg.adminEmails.map((email) => Card(
-            margin: const EdgeInsets.only(bottom: 6),
+          const Card(
             child: ListTile(
-              dense: true,
-              leading: const SectionIcon(icon: Icons.verified_rounded, color: AppTheme.success, size: 36),
-              title: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              subtitle: const Text('مدير نظام / رئيس دائرة', style: TextStyle(fontSize: 11)),
-              trailing: _cfg.adminEmails.length > 1
-                  ? IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: AppTheme.danger, size: 20),
-                      onPressed: () async {
-                        await _cfg.removeAdminEmail(email);
-                        setState(() {});
-                      },
-                    )
-                  : null,
+              leading: Icon(Icons.admin_panel_settings_rounded, color: AppTheme.success),
+              title: Text('إدارة المديرين والصلاحيات'),
+              subtitle: Text('مصدر الصلاحيات هو private.admin_assignments داخل قاعدة البيانات، ولا يعتمد التطبيق على قائمة بريد محلية.'),
             ),
-          )),
+          ),
 
           const SizedBox(height: 20),
           // ---- جداول Supabase ----
-          if (_cfg.isSupabase)
-            Card(
+          Card(
               child: ExpansionTile(
                 leading: const Icon(Icons.table_chart_rounded, color: AppTheme.primary),
                 title: const Text('جداول Supabase المطلوبة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 children: const [
                   Text(
-                    'أنشئ الجداول التالية في SQL Editor:\n\n'
-                    '• devices\n'
-                    '• custody_cards\n'
-                    '• movements\n'
-                    '• maintenance_tickets\n'
-                    '• phone_directory\n'
-                    '• telecom_networks\n'
-                    '• audit_logs\n'
-                    '• pending_requests\n\n'
-                    'كل جدول يحتاج عمود id (text PK) وباقي الحقول حسب النماذج.\n'
-                    'فعّل Row Level Security حسب الحاجة.\n'
-                    'مدير النظام يعتمد الطلبات من جدول pending_requests.',
+                    'الجداول التشغيلية موجودة في مشروع Supabase المرتبط، '
+                    'وتُطبق عليها سياسات Row Level Security.\\n\\n'
+                    'الجداول الأساسية: devices, custody_cards, movements, '
+                    'maintenance_tickets, phone_directory, telecom_networks, '
+                    'audit_logs, pending_requests.\\n\\n'
+                    'لا تُنشئ نسخاً مكررة من هذه الجداول يدوياً.',
                     style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                 ],
@@ -230,7 +204,7 @@ class _UsersScreenState extends State<UsersScreen> {
               title: const Text('معلومات'),
               subtitle: Text(
                 'الدور: مدير النظام\n'
-                'الخلفية: ${_cfg.isSupabase ? "Supabase" : "Firebase"}\n'
+                'الخلفية: Supabase\n'
                 'القسم: ${app.departmentName}',
               ),
               isThreeLine: true,
@@ -242,26 +216,4 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
-  Future<void> _addAdmin(BuildContext context) async {
-    final ctrl = TextEditingController();
-    final email = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('إضافة مدير نظام'),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(labelText: 'البريد الإلكتروني', hintText: 'admin@example.com'),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('إضافة')),
-        ],
-      ),
-    );
-    if (email != null && email.contains('@')) {
-      await _cfg.addAdminEmail(email);
-      setState(() {});
-    }
-  }
 }

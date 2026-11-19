@@ -1,0 +1,236 @@
+name: Flutter validation
+
+on:
+  push:
+    branches: [main, feature/supabase-admin-handover]
+  pull_request:
+    branches: [main, feature/supabase-admin-handover]
+  workflow_dispatch:
+
+concurrency:
+  group: flutter-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 for Android builds
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pin Flutter to Java 21
+        run: |
+          flutter config --jdk-dir="$JAVA_HOME"
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Clean stale Flutter plugin registrants
+        run: flutter clean
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Verify Supabase-only application source
+        run: |
+          if grep -R -n -E "firebase_core|firebase_auth|cloud_firestore|firebase_storage|firebase_messaging|firebase_options|firebase_service" lib pubspec.yaml; then
+            echo "Firebase references found in application source or direct dependencies."
+            exit 1
+          fi
+          echo "No Firebase SDK references or direct Firebase dependencies found."
+
+      - name: Static analysis
+        run: flutter analyze --no-pub --no-fatal-infos
+
+      - name: Unit and widget tests
+        run: flutter test --no-pub
+
+      # Netlify serves the app at the domain root, so the base href must be /.
+      - name: Build Web for Netlify
+        run: flutter build web --release --base-href /
+
+      - name: Configure Android release signing when keystore is present
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+          chmod 600 android/key.properties android/app/upload-keystore.jks
+
+      - name: Build Android APK
+        run: flutter build apk --release
+
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+
+      - name: Upload Web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-web
+          path: build/web/
+          if-no-files-found: error
+
+      - name: Deploy Flutter Web to Netlify
+        if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN or NETLIFY_SITE_ID is missing from GitHub Actions secrets."
+            exit 1
+          fi
+          npx --yes netlify-cli@latest deploy --prod --dir=build/web --site="$NETLIFY_SITE_ID"
+
+      - name: Upload Android APK (production-signed)
+        if: ${{ always() && env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' && hashFiles('build/app/outputs/flutter-apk/app-release.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-apk-production-signed
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Android APK (testing only)
+        if: ${{ always() && (env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_STORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '') && hashFiles('build/app/outputs/flutter-apk/app-release.apk') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-apk-testing-only
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Android App Bundle (production-signed)
+        if: ${{ always() && env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_STORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' && hashFiles('build/app/outputs/bundle/release/app-release.aab') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-aab-production-signed
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Upload Android App Bundle (testing only)
+        if: ${{ always() && (env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_STORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '') && hashFiles('build/app/outputs/bundle/release/app-release.aab') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-android-aab-testing-only
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  build-ios-unsigned:
+    needs: analyze-and-test
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate iOS platform scaffolding
+        run: flutter create --platforms=ios --org com.ibrahemsy .
+
+      - name: Set iOS deployment target for camera scanner
+        run: |
+          ruby -0pi -e "gsub(/^#\\s*platform\\s*:ios,\\s*'[^']+'/, \"platform :ios, '15.5'\")" ios/Podfile
+          ruby -0pi -e "gsub(/IPHONEOS_DEPLOYMENT_TARGET = [^;]+;/, 'IPHONEOS_DEPLOYMENT_TARGET = 15.5;')" ios/Runner.xcodeproj/project.pbxproj
+          grep -n "platform :ios" ios/Podfile
+          grep -n "IPHONEOS_DEPLOYMENT_TARGET" ios/Runner.xcodeproj/project.pbxproj
+
+      - name: Configure iOS camera and photo library privacy descriptions
+        run: |
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'يلزم الوصول إلى الكاميرا لمسح باركود الأصول.'" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'يلزم الوصول إلى الصور لإرفاق صور الأصول والعهد.'" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'يلزم حفظ الصور عند تصدير أو مشاركة مرفقات الأصول.'" ios/Runner/Info.plist
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload unsigned iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-ios-unsigned-app
+          path: build/ios/iphoneos/Runner.app/
+          if-no-files-found: error
+
+      - name: Upload generated iOS project
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-ios-project
+          path: ios/
+          if-no-files-found: error
+
+  build-windows-desktop:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Generate Windows platform scaffolding
+        run: flutter create --platforms=windows --org com.ibrahemsy .
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build Windows desktop application
+        run: flutter build windows --release
+
+      - name: Package Windows desktop application
+        shell: pwsh
+        run: |
+          $source = "build/windows/x64/runner/Release"
+          if (!(Test-Path "$source/*.exe")) {
+            throw "Windows executable was not produced."
+          }
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          Compress-Archive -Path "$source/*" -DestinationPath "dist/asset-flow-windows-x64.zip" -Force
+
+      - name: Upload Windows desktop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-windows-desktop-x64
+          path: dist/asset-flow-windows-x64.zip
+          if-no-files-found: error
