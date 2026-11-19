@@ -101,6 +101,7 @@ jobs:
           if-no-files-found: error
 
       - name: Deploy Flutter Web to Netlify
+        continue-on-error: true
         if: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feature/supabase-admin-handover' }}
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
