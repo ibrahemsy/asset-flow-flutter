@@ -193,3 +193,44 @@ jobs:
           name: asset-flow-ios-project
           path: ios/
           if-no-files-found: error
+
+  build-windows-desktop:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Generate Windows platform scaffolding
+        run: flutter create --platforms=windows --org com.ibrahemsy .
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build Windows desktop application
+        run: flutter build windows --release
+
+      - name: Package Windows desktop application
+        shell: pwsh
+        run: |
+          $source = "build/windows/x64/runner/Release"
+          if (!(Test-Path "$source/*.exe")) {
+            throw "Windows executable was not produced."
+          }
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          Compress-Archive -Path "$source/*" -DestinationPath "dist/asset-flow-windows-x64.zip" -Force
+
+      - name: Upload Windows desktop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-flow-windows-desktop-x64
+          path: dist/asset-flow-windows-x64.zip
+          if-no-files-found: error
